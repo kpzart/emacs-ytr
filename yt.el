@@ -38,15 +38,15 @@
 
 (require 'plz)
 
-(defcustom yt-baseurl "https://somewhere.youtrack.cloud" "Base url of your youtrack server" :type 'string)
+(defcustom yt-baseurl "https://somewhere.youtrack.cloud" "Base url of your youtrack server" :type 'string :group "yt")
 
-(defcustom yt-access-token "" "Your access token" :type 'string)
+(defcustom yt-access-token "" "Your access token" :type 'string :group "yt")
 
-(defcustom yt-queries () "Define your Queries here" :type '(repeat string))
+(defcustom yt-queries () "Define your Queries here" :type '(repeat string) :group "yt")
 
 (defun kpz/yt-retrieve-search-issues-alist (query)
   "Retrieve list of issues by query"
-  (plz 'get (concat yt-base-url "/api/issues?fields=idReadable,summary&query=" (url-encode-url query))
+  (plz 'get (concat yt-baseurl "/api/issues?fields=idReadable,summary&query=" (url-encode-url query))
     :headers `(("Authorization" . ,(concat "Bearer " yt-access-token))
                ("Accept" . "application/json")
                ("Content-Type" . "application/json"))
@@ -57,13 +57,13 @@
   "Present a list of resolved issues in the minibuffer"
   (interactive)
   (let* ((query (completing-read "Query:" yt-queries))
-         (result (ytkpz-retrieve-search-issues-alist query))
+         (result (kpz/yt-retrieve-search-issues-alist query))
          (choices (mapcar (lambda (item)
                            (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
                          result))
          (choice (completing-read "Issue: " choices))
          (choice-id (car (split-string choice ":"))))
-    (browse-url (concat yt-base-url "/issue/" choice-id))
+    (browse-url (concat yt-baseurl "/issue/" choice-id))
     )
   )
 
