@@ -48,7 +48,7 @@
 
 (defun kpz/yt-retrieve-search-issues-alist (query)
   "Retrieve list of issues by query"
-  (plz 'get (concat yt-baseurl "/api/issues?fields=idReadable,summary&query=" (url-encode-url query))
+  (plz 'get (concat yt-baseurl "/api/issues?fields=idReadable,summary&query=" (url-hexify-string query))
     :headers `(("Authorization" . ,(concat "Bearer " yt-access-token))
                ("Accept" . "application/json")
                ("Content-Type" . "application/json"))
