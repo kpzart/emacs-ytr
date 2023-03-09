@@ -84,5 +84,126 @@
     )
   )
 
+(defun kpz/yt-retrieve-issue-alist (issue)
+  "Retrieve information concering the given issue and return an alist."
+  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue "?fields=id,idReadable,summary,description,comments(id,text)")
+    :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
+               ("Accept" . "application/json")
+               ("Content-Type" . "application/json"))
+    :as #'json-read
+    ))
+
+(defun kpz/yt-md-to-org (input)
+  "Convert a markdown string to org mode using pandoc"
+  (save-current-buffer
+    (set-buffer (get-buffer-create "*yt-convert*"))
+    (setf (buffer-string) "")
+    (insert input)
+    (shell-command-on-region (point-min) (point-max)
+                             (format "pandoc -f gfm -t org")
+                             nil t "*yt-convert-error*")
+    (org-mode)
+    (kpz/yt-demote-org-headings 3)
+    (buffer-string)
+    )
+)
+
+(defun kpz/yt-alist-to-org (input)
+  "Convert an alist of markdown code into an org buffer with proper headings"
+  (set-buffer (get-buffer-create "*kpz/yt-org*"))
+  (setf (buffer-string) "")
+  (org-mode)
+  (let-alist input
+    ;; title and description
+    (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
+    (org-insert-heading)
+    (insert (concat .idReadable ": " .summary "\n\n"))
+    (org-insert-subheading t)
+    (insert "Description\n\n")
+    (insert (kpz/yt-md-to-org .description))
+
+    ;; do the comments
+    (mapcar (lambda (comment-alist)
+              (org-insert-heading 2 nil t)
+              (org-demote)
+              (insert (concat "Comment\n\n"))
+              (let-alist comment-alist
+                (insert (kpz/yt-md-to-org .text))
+                ))
+            .comments)
+
+    ;; postprocess
+    (org-unindent-buffer)
+    (switch-to-buffer "*kpz/yt-org*")
+    )
+  )
+
+(defun kpz/yt-issue-org ()
+  "Retrieve an issue and convert it to a temporary org buffer"
+  (interactive)
+  (let* ((query (completing-read "Query: " yt-queries nil nil))
+         (result (kpz/yt-retrieve-search-issues-alist query))
+         (choices (mapcar (lambda (item)
+                            (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
+                          result))
+         (choice (completing-read "Issue: " choices))
+         (choice-id (car (split-string choice ":"))))
+    (kpz/yt-alist-to-org (kpz/yt-retrieve-issue-alist choice-id))
+    (org-fold-show-all)
+    (goto-char (point-min))
+    )
+  )
+
+(defun kpz/yt-max-heading-level ()
+  (org-fold-show-all)
+  (setq base-level nil)
+  (goto-char (point-min))
+  (when (not (org-at-heading-p))
+    (org-next-visible-heading 1)
+    )
+  (setq last-point 0)
+  (while (and (org-at-heading-p) (/= (point) last-point))
+    (setq base-level (if (and base-level (< base-level (org-current-level))) base-level (org-current-level)))
+    (org-next-visible-heading 1)
+    )
+  base-level
+  )
+
+(defun kpz/yt-first-heading-level ()
+  (org-fold-show-all)
+  (goto-char (point-min))
+  (when (not (org-at-heading-p))
+    (org-next-visible-heading 1)
+    )
+  (org-current-level)
+  )
+
+(defun kpz/yt-demote-org-headings (level)
+  (setq base-level (kpz/yt-max-heading-level))
+  (when base-level
+    (if (< level base-level)
+        (progn
+          (setq dir -1)
+          (goto-char (point-max)))
+      (progn
+        (setq dir 1)
+        (goto-char (point-min))))
+
+    (setq last-point 0)
+    (when (not (org-at-heading-p))
+      (org-next-visible-heading dir))
+    (while (and (/= (point) last-point) (org-at-heading-p))
+      (when (= (org-current-level) base-level)
+        (let ((levelsteps (- level (org-current-level))))
+          (if (> levelsteps 0)
+              (dotimes (i levelsteps)
+                (org-demote-subtree))
+            (dotimes (i (- 0 levelsteps))
+              (org-promote-subtree))
+            )))
+      (setq last-point (point))
+      (org-next-visible-heading dir)))
+  )
+
 (provide 'yt)
 ;;; yt.el ends here
