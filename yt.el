@@ -55,6 +55,10 @@
     :as #'json-read
     ))
 
+(defun kpz/yt-issue-url (shortcode)
+  "Return the URL for a issue given by shortcode"
+  (concat yt-baseurl "/issue/" shortcode))
+
 (defun kpz/yt-query ()
   "Present a list of resolved issues in the minibuffer"
   (interactive)
@@ -65,7 +69,7 @@
                          result))
          (choice (completing-read "Issue: " choices))
          (choice-id (car (split-string choice ":"))))
-    (browse-url (concat yt-baseurl "/issue/" choice-id))
+    (browse-url (kpz/yt-issue-url choice-id))
     )
   )
 
@@ -80,7 +84,7 @@
                           result))
          (choice (completing-read "Issue: " choices))
          (choice-id (car (split-string choice ":"))))
-    (browse-url (concat yt-baseurl "/issue/" choice-id))
+    (browse-url (kpz/yt-issue-url choice-id))
     )
   )
 
@@ -204,6 +208,25 @@
       (setq last-point (point))
       (org-next-visible-heading dir)))
   )
+
+;; Issue buttons
+
+(define-button-type 'issue-button
+  'follow-link t
+  'action #'kpz/yt-on-issue-button)
+
+(defun kpz/yt-on-issue-button (button)
+  (browse-url (kpz/yt-issue-url (buffer-substring (button-start button) (button-end button)))))
+
+(defun kpz/yt-issue-buttonize-buffer ()
+  "turn all issue shortcodes into buttons"
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward "[A-z]+-[0-9]+" nil t)
+      (make-button (match-beginning 0) (match-end 0) :type 'issue-button))))
+
+(add-hook 'org-mode-hook 'kpz/yt-issue-buttonize-buffer)
 
 (provide 'yt)
 ;;; yt.el ends here
