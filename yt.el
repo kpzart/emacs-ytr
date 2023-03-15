@@ -46,7 +46,7 @@
 
 (defcustom yt-queries () "Define your Queries here" :type '(repeat string) :group 'yt)
 
-(defun kpz/yt-retrieve-search-issues-alist (query)
+(defun kpz/yt-retrieve-query-issues-alist (query)
   "Retrieve list of issues by query"
   (plz 'get (concat yt-baseurl "/api/issues?fields=idReadable,summary&query=" (url-hexify-string query))
     :headers `(("Authorization" . ,(concat "Bearer " yt-access-token))
@@ -59,11 +59,11 @@
   "Return the URL for a issue given by shortcode"
   (concat yt-baseurl "/issue/" shortcode))
 
-(defun kpz/yt-query ()
+(defun kpz/yt-query-browse ()
   "Present a list of resolved issues in the minibuffer"
   (interactive)
   (let* ((query (completing-read "Query: " yt-queries nil nil))
-         (result (kpz/yt-retrieve-search-issues-alist query))
+         (result (kpz/yt-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
                            (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
                          result))
@@ -73,12 +73,12 @@
     )
   )
 
-(defun kpz/yt-query-refine ()
+(defun kpz/yt-query-refine-browse ()
   "Present a list of resolved issues in the minibuffer"
   (interactive)
   (let* ((query-orig (completing-read "Query: " yt-queries nil t))
          (query (read-string "Refine query: " query-orig nil))
-         (result (kpz/yt-retrieve-search-issues-alist query))
+         (result (kpz/yt-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
                             (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
                           result))
@@ -88,6 +88,7 @@
     )
   )
 
+;;  org mode conversion
 (defun kpz/yt-retrieve-issue-alist (issue)
   "Retrieve information concering the given issue and return an alist."
   (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue "?fields=id,idReadable,summary,description,comments(id,text)")
@@ -142,11 +143,11 @@
     )
   )
 
-(defun kpz/yt-issue-org ()
-  "Retrieve an issue and convert it to a temporary org buffer"
+(defun kpz/yt-query-org ()
+  "Start a query to retrieve an issue and convert it to a temporary org buffer"
   (interactive)
   (let* ((query (completing-read "Query: " yt-queries nil nil))
-         (result (kpz/yt-retrieve-search-issues-alist query))
+         (result (kpz/yt-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
                             (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
                           result))
