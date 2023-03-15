@@ -113,7 +113,7 @@
     )
 )
 
-(defun kpz/yt-alist-to-org (input)
+(defun kpz/yt-issue-alist-to-org (input shortcode)
   "Convert an alist of markdown code into an org buffer with proper headings"
   (set-buffer (get-buffer-create "*kpz/yt-org*"))
   (setf (buffer-string) "")
@@ -121,18 +121,22 @@
   (let-alist input
     ;; title and description
     (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
-    (org-insert-heading)
-    (insert (concat .idReadable ": " .summary "\n\n"))
-    (org-insert-subheading t)
-    (insert "Description\n\n")
+    (org-set-property "YT_SHORTCODE" shortcode)
+    (org-set-property "YT_ID" .id)
+    (org-set-property "YT_TYPE" "ticket")
+    (insert (concat "* ".idReadable ": " .summary "\n\n"))
+    (insert "** Description\n\n")
+    (org-set-property "YT_CONTENT_HASH" (sha1 .description))
+    (org-set-property "YT_TYPE" "description")
     (insert (kpz/yt-md-to-org .description))
 
     ;; do the comments
     (mapcar (lambda (comment-alist)
-              (org-insert-heading 2 nil t)
-              (org-demote)
-              (insert (concat "Comment\n\n"))
+              (insert (concat "*** Comment\n\n"))
               (let-alist comment-alist
+                (org-set-property "YT_CONTENT_HASH" (sha1 .text))
+                (org-set-property "YT_ID" .id)
+                (org-set-property "YT_TYPE" "comment")
                 (insert (kpz/yt-md-to-org .text))
                 ))
             .comments)
@@ -153,7 +157,7 @@
                           result))
          (choice (completing-read "Issue: " choices))
          (choice-id (car (split-string choice ":"))))
-    (kpz/yt-alist-to-org (kpz/yt-retrieve-issue-alist choice-id))
+    (kpz/yt-issue-alist-to-org (kpz/yt-retrieve-issue-alist choice-id) choice-id)
     (org-fold-show-all)
     (goto-char (point-min))
     )
