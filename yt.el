@@ -89,12 +89,32 @@
   )
 
 ;;  org mode conversion
-(defun kpz/yt-retrieve-issue-alist (issue)
+(defun kpz/yt-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue "?fields=id,idReadable,summary,description,comments(id,text)")
+  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text)")
     :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
                ("Accept" . "application/json")
                ("Content-Type" . "application/json"))
+    :as #'json-read
+    ))
+
+(defun kpz/yt-send-issue-comment-alist (issue-id comment-id alist)
+  "Send the information in ALIST for a remote update of an issue comment with id ISSUE"
+  (plz 'post (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "/comments/" comment-id "?fields=text")
+    :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
+               ("Accept" . "application/json")
+               ("Content-Type" . "application/json"))
+    :body (json-encode alist)
+    :as #'json-read
+    ))
+
+(defun kpz/yt-send-issue-alist (issue alist)
+  "Send the information in ALIST for a remote update of issue with id ISSUE"
+  (plz 'post (concat "https://matlantis.youtrack.cloud/api/issues/" issue "?fields=description")
+    :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
+               ("Accept" . "application/json")
+               ("Content-Type" . "application/json"))
+    :body (json-encode alist)
     :as #'json-read
     ))
 
@@ -215,6 +235,33 @@
       (org-next-visible-heading dir)))
   )
 
+(defun kpz/yt-send-node ()
+  "Update a node on remote side after editing locally"
+  (interactive)
+  (let ((type (kpz/yt-find-node))
+        (issue-id (org-entry-get (point) "YT_SHORTCODE" t))
+        (node-id (org-entry-get (point) "YT_ID" t)))
+    ;; (message (format "%s %s" issue-id node-id))
+    (save-window-excursion
+      (org-gfm-export-as-markdown nil t)
+      (markdown-mode)
+      (when (y-or-n-p (format "Send this content as %s with id %s to ticket %s?" type node-id issue-id))
+        (when (string= type "description") (kpz/yt-send-issue-alist issue-id `((description . ,(buffer-string)))))
+        (when (string= type "comment") (kpz/yt-send-issue-comment-alist issue-id node-id`((text . ,(buffer-string)))))
+        (message "Node successfully updated"))
+      ))
+  )
+
+(defun kpz/yt-find-node ()
+  "Find the parent heading with a YT_TYPE property, sets the point and returns the type. If property is not found in buffer returns nil."
+  (when (or (org-at-heading-p) (org-back-to-heading))
+    (let ((type (org-entry-get (point) "YT_TYPE")))
+      (if (or (string= type "comment") (string= type "description"))
+          type
+        (if (org-up-heading-safe)
+            (kpz/yt-node-type-p)
+          nil))))
+)
 ;; Issue buttons
 
 (define-button-type 'issue-button
