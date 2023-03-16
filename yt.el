@@ -244,7 +244,7 @@
 
 (defun kpz/yt-issue-from-org-property ()
   "Return the shortcode defined by an org property YT_SHORTCODE or nil"
-  (org-entry-get (point) "YT_SHORTCODE"))
+  (org-entry-get (point) "YT_SHORTCODE" t))
 
 (defun kpz/yt-guess-read-issue ()
   (let ((issue (kpz/yt-issue-from-point)))
