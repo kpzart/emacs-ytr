@@ -115,36 +115,37 @@
 
 (defun kpz/yt-issue-alist-to-org (input shortcode)
   "Convert an alist of markdown code into an org buffer with proper headings"
-  (set-buffer (get-buffer-create "*kpz/yt-org*"))
-  (setf (buffer-string) "")
-  (org-mode)
-  (let-alist input
-    ;; title and description
-    (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
-    (org-set-property "YT_SHORTCODE" shortcode)
-    (org-set-property "YT_ID" .id)
-    (org-set-property "YT_TYPE" "ticket")
-    (insert (concat "* ".idReadable ": " .summary "\n\n"))
-    (insert "** Description\n\n")
-    (org-set-property "YT_CONTENT_HASH" (sha1 .description))
-    (org-set-property "YT_TYPE" "description")
-    (insert (kpz/yt-md-to-org .description))
+  (let ((bufname (format "*kpz/yt-org-%s*" (downcase shortcode))))
+    (set-buffer (get-buffer-create bufname))
+    (setf (buffer-string) "")
+    (org-mode)
+    (let-alist input
+      ;; title and description
+      (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
+      (org-set-property "YT_SHORTCODE" shortcode)
+      (org-set-property "YT_ID" .id)
+      (org-set-property "YT_TYPE" "ticket")
+      (insert (concat "* ".idReadable ": " .summary "\n\n"))
+      (insert "** Description\n\n")
+      (org-set-property "YT_CONTENT_HASH" (sha1 .description))
+      (org-set-property "YT_TYPE" "description")
+      (insert (kpz/yt-md-to-org .description))
 
-    ;; do the comments
-    (mapcar (lambda (comment-alist)
-              (insert (concat "*** Comment\n\n"))
-              (let-alist comment-alist
-                (org-set-property "YT_CONTENT_HASH" (sha1 .text))
-                (org-set-property "YT_ID" .id)
-                (org-set-property "YT_TYPE" "comment")
-                (insert (kpz/yt-md-to-org .text))
-                ))
-            .comments)
+      ;; do the comments
+      (mapcar (lambda (comment-alist)
+                (insert (concat "*** Comment\n\n"))
+                (let-alist comment-alist
+                  (org-set-property "YT_CONTENT_HASH" (sha1 .text))
+                  (org-set-property "YT_ID" .id)
+                  (org-set-property "YT_TYPE" "comment")
+                  (insert (kpz/yt-md-to-org .text))
+                  ))
+              .comments)
 
-    ;; postprocess
-    (org-unindent-buffer)
-    (switch-to-buffer "*kpz/yt-org*")
-    )
+      ;; postprocess
+      (org-unindent-buffer)
+      (switch-to-buffer bufname)
+      ))
   )
 
 (defun kpz/yt-query-org ()
