@@ -133,7 +133,7 @@
 
       ;; do the comments
       (mapcar (lambda (comment-alist)
-                (insert (concat "*** Comment\n\n"))
+                (insert (concat "** Comment\n\n"))
                 (let-alist comment-alist
                   (org-set-property "YT_CONTENT_HASH" (sha1 .text))
                   (org-set-property "YT_ID" .id)
