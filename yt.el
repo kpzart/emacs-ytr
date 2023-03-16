@@ -228,8 +228,8 @@
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    (while (re-search-forward "[A-z]+-[0-9]+" nil t)
-      (make-button (match-beginning 0) (match-end 0) :type 'issue-button))))
+    (while (re-search-forward "[^A-z0-9-]\\([A-z]+-[0-9]+\\)[^A-z0-9-]" nil t)
+      (make-button (match-beginning 1) (match-end 1) :type 'issue-button))))
 
 (add-hook 'org-mode-hook 'kpz/yt-issue-buttonize-buffer)
 
