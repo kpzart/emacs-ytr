@@ -233,5 +233,39 @@
 
 (add-hook 'org-mode-hook 'kpz/yt-issue-buttonize-buffer)
 
+;; Be Smart
+(defun kpz/yt-issue-from-point ()
+  "Return the shortcode at point or nil if there is none"
+  (let ((candidate (ffap-string-at-point)))
+    (if (string-match-p "[A-z]+-[0-9]+" candidate)
+        candidate
+      nil))
+  )
+
+(defun kpz/yt-issue-from-org-property ()
+  "Return the shortcode defined by an org property YT_SHORTCODE or nil"
+  (org-entry-get (point) "YT_SHORTCODE"))
+
+(defun kpz/yt-guess-read-issue ()
+  (let ((issue (kpz/yt-issue-from-point)))
+    (if issue issue
+      (let ((issue (kpz/yt-issue-from-org-property)))
+        (if issue issue nil)))))
+
+(defun kpz/yt-smart-query-browse ()
+  "Present a list of resolved issues in the minibuffer"
+  (interactive)
+  (let ((issue (kpz/yt-guess-read-issue)))
+    (if issue
+        (browse-url (kpz/yt-issue-url issue))
+      (let* ((query (completing-read "Query: " yt-queries nil nil))
+             (result (kpz/yt-retrieve-query-issues-alist query))
+             (choices (mapcar (lambda (item)
+                                (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
+                              result))
+             (choice (completing-read "Issue: " choices))
+             (choice-id (car (split-string choice ":"))))
+        (browse-url (kpz/yt-issue-url choice-id))))))
+
 (provide 'yt)
 ;;; yt.el ends here
