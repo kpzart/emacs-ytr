@@ -60,9 +60,9 @@
   (concat yt-baseurl "/issue/" shortcode))
 
 (defun kpz/yt-query-browse ()
-  "Present a list of resolved issues in the minibuffer"
+  "Open an issue in the webbrowser"
   (interactive)
-  (let* ((choice-id (kpz/yt-query-shortcode)))
+  (let* ((choice-id (kpz/yt-guess-or-query-shortcode)))
     (browse-url (kpz/yt-issue-url choice-id))
     )
   )
@@ -194,10 +194,16 @@
     (car (split-string choice ":")))
   )
 
+(defun kpz/yt-guess-or-query-shortcode ()
+  "Guess shortcode on context or start a query."
+  (let ((guess (kpz/yt-guess-shortcode)))
+    (if guess guess (kpz/yt-query-shortcode)))
+  )
+
 (defun kpz/yt-query-org ()
-  "Start a query to retrieve an issue and convert it to a temporary org buffer"
+  "Retrieve an issue and convert it to a temporary org buffer"
   (interactive)
-  (let ((choice-id (kpz/yt-query-shortcode)))
+  (let ((choice-id (kpz/yt-guess-or-query-shortcode)))
     (kpz/yt-issue-alist-to-org (kpz/yt-retrieve-issue-alist choice-id) choice-id)
     (org-fold-show-all)
     (goto-char (point-min))
@@ -258,7 +264,7 @@
 (defun kpz/yt-new-comment ()
   "Send the current subtree as comment to a ticket"
   (interactive)
-  (let* ((issue-id (kpz/yt-query-shortcode)))
+  (let* ((issue-id (kpz/yt-guess-or-query-shortcode)))
     (save-window-excursion
       (org-gfm-export-as-markdown nil t)
       (markdown-mode)
@@ -348,14 +354,14 @@
 )
 ;; Issue buttons
 
-(define-button-type 'issue-button
+(define-button-type 'shortcode-button
   'follow-link t
-  'action #'kpz/yt-on-issue-button)
+  'action #'kpz/yt-on-shortcode-button)
 
-(defun kpz/yt-on-issue-button (button)
+(defun kpz/yt-on-shortcode-button (button)
   (browse-url (kpz/yt-issue-url (buffer-substring (button-start button) (button-end button)))))
 
-(defun kpz/yt-issue-buttonize-buffer ()
+(defun kpz/yt-shortcode-buttonize-buffer ()
   "turn all issue shortcodes into buttons"
   (interactive)
   (save-excursion
@@ -363,10 +369,10 @@
     (while (re-search-forward "[^A-z0-9-]\\([A-z]+-[0-9]+\\)[^A-z0-9-]" nil t)
       (make-button (match-beginning 1) (match-end 1) :type 'issue-button))))
 
-(add-hook 'org-mode-hook 'kpz/yt-issue-buttonize-buffer)
+(add-hook 'org-mode-hook 'kpz/yt-shortcode-buttonize-buffer)
 
 ;; Be Smart
-(defun kpz/yt-issue-from-point ()
+(defun kpz/yt-shortcode-from-point ()
   "Return the shortcode at point or nil if there is none"
   (let ((candidate (ffap-string-at-point)))
     (if (string-match-p "[A-z]+-[0-9]+" candidate)
@@ -374,20 +380,21 @@
       nil))
   )
 
-(defun kpz/yt-issue-from-org-property ()
+(defun kpz/yt-shortcode-from-org-property ()
   "Return the shortcode defined by an org property YT_SHORTCODE or nil"
   (org-entry-get (point) "YT_SHORTCODE" t))
 
-(defun kpz/yt-guess-read-issue ()
-  (let ((issue (kpz/yt-issue-from-point)))
+(defun kpz/yt-guess-shortcode ()
+  "Return a shortcode from current context."
+  (let ((issue (kpz/yt-shortcode-from-point)))
     (if issue issue
-      (let ((issue (kpz/yt-issue-from-org-property)))
+      (let ((issue (kpz/yt-shortcode-from-org-property)))
         (if issue issue nil)))))
 
 (defun kpz/yt-smart-query-browse ()
-  "Present a list of resolved issues in the minibuffer"
+  "Browse an issue. Be smart which one."
   (interactive)
-  (let ((issue (kpz/yt-guess-read-issue)))
+  (let ((issue (kpz/yt-guess-shortcode)))
     (if issue
         (browse-url (kpz/yt-issue-url issue))
       (let* ((query (completing-read "Query: " yt-queries nil nil))
