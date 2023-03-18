@@ -157,6 +157,7 @@
       (insert (concat "* ".idReadable ": " .summary "\n\n"))
       (insert "** Description\n\n")
       (org-set-property "YT_CONTENT_HASH" (sha1 .description))
+      (org-set-property "YT_ID" .id)
       (org-set-property "YT_TYPE" "description")
       (insert (kpz/yt-md-to-org .description))
 
@@ -262,20 +263,53 @@
              (alist-get 'text (kpz/yt-retrieve-issue-comment-alist issue-id node-id)))))
          (local-hash (org-entry-get (point) "YT_CONTENT_HASH" t))
          )
-    ;; (message (format "%s %s" issue-id node-id))
-    (if (string= local-hash remote-hash)
-        (save-window-excursion
-          (org-gfm-export-as-markdown nil t)
-          (markdown-mode)
-          (replace-regexp "^#" "##" nil (point-min) (point-max))
-          (when (y-or-n-p (format "Send this content as %s with id %s to ticket %s?" type node-id issue-id))
-            (if (eq type 'description)
-                (kpz/yt-send-issue-alist issue-id `((description . ,(buffer-string))))
-              (kpz/yt-send-issue-comment-alist issue-id node-id`((text . ,(buffer-string)))))
-            (message "Node successfully updated"))
-          )
-      (message (format "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
-      ))
+    (when (not (string= local-hash remote-hash))
+        (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
+
+    (save-window-excursion
+      (org-gfm-export-as-markdown nil t)
+      (markdown-mode)
+      (replace-regexp "^#" "##" nil (point-min) (point-max))
+      (when (y-or-n-p (format "Send this content as %s with id %s to ticket %s?" type node-id issue-id))
+        (if (eq type 'description)
+            (kpz/yt-send-issue-alist issue-id `((description . ,(buffer-string))))
+          (kpz/yt-send-issue-comment-alist issue-id node-id`((text . ,(buffer-string)))))
+        (message "Node successfully updated"))
+      )
+
+    (kpz/yt-fetch-node))
+  )
+
+(defun kpz/yt-capitalize-first-char (&optional string)
+  "Capitalize only the first character of the input STRING."
+  (when (and string (> (length string) 0))
+    (let ((first-char (substring string nil 1))
+          (rest-str   (substring string 1)))
+      (concat (capitalize first-char) rest-str))))
+
+(defun kpz/yt-fetch-node ()
+  "Update a local node withs its remote content"
+  (interactive)
+  (let* ((type-str (kpz/yt-find-node))
+         (type (if (string= type-str "description")
+                   'description
+                 (if (string= type-str "comment")
+                     'comment
+                   (user-error "Unknown node type: %s" type-str))))
+         (issue-id (org-entry-get (point) "YT_SHORTCODE" t))
+         (node-id (org-entry-get (point) "YT_ID" t))
+         (content
+           (if (eq type 'description)
+               (alist-get 'description (kpz/yt-retrieve-issue-alist issue-id))
+             (alist-get 'text (kpz/yt-retrieve-issue-comment-alist issue-id node-id)))))
+    ;; markiere den subtree und ersetze ihn durch das geholte, setze die properties
+    (org-cut-subtree)
+    (insert (concat "** " (kpz/yt-capitalize-first-char type-str) "\n\n"))
+    (org-set-property "YT_CONTENT_HASH" (sha1 content))
+    (org-set-property "YT_ID" node-id)
+    (org-set-property "YT_TYPE" type-str)
+    (insert (kpz/yt-md-to-org content))
+    )
   )
 
 (defun kpz/yt-find-node ()
