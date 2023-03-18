@@ -245,6 +245,7 @@
     (save-window-excursion
       (org-gfm-export-as-markdown nil t)
       (markdown-mode)
+      (replace-regexp "^#" "##" nil (point-min) (point-max))
       (when (y-or-n-p (format "Send this content as %s with id %s to ticket %s?" type node-id issue-id))
         (when (string= type "description") (kpz/yt-send-issue-alist issue-id `((description . ,(buffer-string)))))
         (when (string= type "comment") (kpz/yt-send-issue-comment-alist issue-id node-id`((text . ,(buffer-string)))))
