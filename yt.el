@@ -85,7 +85,7 @@
 ;;  org mode conversion
 (defun kpz/yt-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text)")
+  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login)),created,reporter(login)")
     :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
                ("Accept" . "application/json")
                ("Content-Type" . "application/json"))
@@ -94,7 +94,7 @@
 
 (defun kpz/yt-retrieve-issue-comment-alist (issue-id comment-id)
   "Retrieve information concering the given issue and return an alist."
-  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "/comments/" comment-id "?fields=id,text")
+  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,author(login)")
     :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
                ("Accept" . "application/json")
                ("Content-Type" . "application/json"))
@@ -159,22 +159,11 @@
       (org-set-property "YT_ID" .id)
       (org-set-property "YT_TYPE" "ticket")
       (insert (concat "* ".idReadable ": " .summary "\n\n"))
-      (insert "** Description\n\n")
-      (org-set-property "YT_CONTENT_HASH" (sha1 .description))
-      (org-set-property "YT_ID" .id)
-      (org-set-property "YT_TYPE" "description")
-      (insert (kpz/yt-md-to-org .description))
-      (insert "\n")
+      (kpz/yt-org-insert-node .description 'description .id (alist-get 'login .reporter) .created)
       ;; do the comments
       (mapcar (lambda (comment-alist)
-                (insert (concat "** Comment\n\n"))
                 (let-alist comment-alist
-                  (org-set-property "YT_CONTENT_HASH" (sha1 .text))
-                  (org-set-property "YT_ID" .id)
-                  (org-set-property "YT_TYPE" "comment")
-                  (insert (kpz/yt-md-to-org .text))
-                  (insert "\n")
-                  ))
+                  (kpz/yt-org-insert-node .text 'comment .id (alist-get 'login .author) .created)))
               .comments)
 
       ;; postprocess
@@ -200,7 +189,7 @@
     (if guess guess (kpz/yt-query-shortcode)))
   )
 
-(defun kpz/yt-query-org ()
+(defun kpz/yt-smart-query-org ()
   "Retrieve an issue and convert it to a temporary org buffer"
   (interactive)
   (let ((choice-id (kpz/yt-guess-or-query-shortcode)))
@@ -317,6 +306,23 @@
           (rest-str   (substring string 1)))
       (concat (capitalize first-char) rest-str))))
 
+(defun kpz/yt-org-insert-node (content type node-id author created)
+  "Insert a comment node at point, type is generic, author is a string, created is a long value"
+  (message "%s" author)
+  (insert (format "** %s %s by %s\n\n"
+                  (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
+                  (kpz/yt-capitalize-first-char (format "%s" type))
+                  author
+                  ))
+  (insert (kpz/yt-md-to-org content))
+  (insert "\n")
+  (previous-line)
+  (org-set-property "YT_CONTENT_HASH" (sha1 content))
+  (org-set-property "YT_ID" node-id)
+  (org-set-property "YT_TYPE" (format "%s" type))
+  (next-line)
+  )
+
 (defun kpz/yt-fetch-node ()
   "Update a local node withs its remote content"
   (interactive)
@@ -325,21 +331,27 @@
                    'description
                  (if (string= type-str "comment")
                      'comment
-                   (user-error "Unknown node type: %s" type-str))))
+                   (user-error "Cannot fetch node of type %s" type-str))))
          (issue-id (org-entry-get (point) "YT_SHORTCODE" t))
          (node-id (org-entry-get (point) "YT_ID" t))
+         (node-alist
+          (if (eq type 'description)
+              (kpz/yt-retrieve-issue-alist issue-id)
+            (kpz/yt-retrieve-issue-comment-alist issue-id node-id))
+          )
+         (created (alist-get 'created node-alist))
+         (author (alist-get 'login
+                            (if (eq type 'description)
+                                (alist-get 'reporter node-alist)
+                              (alist-get 'author node-alist))))
          (content
            (if (eq type 'description)
-               (alist-get 'description (kpz/yt-retrieve-issue-alist issue-id))
-             (alist-get 'text (kpz/yt-retrieve-issue-comment-alist issue-id node-id)))))
+               (alist-get 'description node-alist)
+             (alist-get 'text node-alist)))
+         )
     ;; markiere den subtree und ersetze ihn durch das geholte, setze die properties
     (org-cut-subtree)
-    (insert (concat "** " (kpz/yt-capitalize-first-char type-str) "\n\n"))
-    (org-set-property "YT_CONTENT_HASH" (sha1 content))
-    (org-set-property "YT_ID" node-id)
-    (org-set-property "YT_TYPE" type-str)
-    (insert (kpz/yt-md-to-org content))
-    )
+    (kpz/yt-org-insert-node content type node-id author created))
   )
 
 (defun kpz/yt-find-node ()
@@ -349,7 +361,7 @@
       (if (or (string= type "comment") (string= type "description"))
           type
         (if (org-up-heading-safe)
-            (kpz/yt-node-type-p)
+            (kpz/yt-find-node)
           nil))))
 )
 ;; Issue buttons
