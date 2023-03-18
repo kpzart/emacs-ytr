@@ -98,6 +98,15 @@
     :as #'json-read
     ))
 
+(defun kpz/yt-retrieve-issue-comment-alist (issue-id comment-id)
+  "Retrieve information concering the given issue and return an alist."
+  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "/comments/" comment-id "?fields=id,text")
+    :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
+               ("Accept" . "application/json")
+               ("Content-Type" . "application/json"))
+    :as #'json-read
+    ))
+
 (defun kpz/yt-send-issue-comment-alist (issue-id comment-id alist)
   "Send the information in ALIST for a remote update of an issue comment with id ISSUE"
   (plz 'post (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "/comments/" comment-id "?fields=text")
@@ -238,18 +247,34 @@
 (defun kpz/yt-send-node ()
   "Update a node on remote side after editing locally"
   (interactive)
-  (let ((type (kpz/yt-find-node))
-        (issue-id (org-entry-get (point) "YT_SHORTCODE" t))
-        (node-id (org-entry-get (point) "YT_ID" t)))
+  (let* ((type-str (kpz/yt-find-node))
+         (type (if (string= type-str "description")
+                   'description
+                 (if (string= type-str "comment")
+                     'comment
+                   (user-error (format "Unknown node type: %s" type-str)))))
+         (issue-id (org-entry-get (point) "YT_SHORTCODE" t))
+         (node-id (org-entry-get (point) "YT_ID" t))
+         (remote-hash
+          (sha1
+           (if (eq type 'description)
+               (alist-get 'description (kpz/yt-retrieve-issue-alist issue-id))
+             (alist-get 'text (kpz/yt-retrieve-issue-comment-alist issue-id node-id)))))
+         (local-hash (org-entry-get (point) "YT_CONTENT_HASH" t))
+         )
     ;; (message (format "%s %s" issue-id node-id))
-    (save-window-excursion
-      (org-gfm-export-as-markdown nil t)
-      (markdown-mode)
-      (replace-regexp "^#" "##" nil (point-min) (point-max))
-      (when (y-or-n-p (format "Send this content as %s with id %s to ticket %s?" type node-id issue-id))
-        (when (string= type "description") (kpz/yt-send-issue-alist issue-id `((description . ,(buffer-string)))))
-        (when (string= type "comment") (kpz/yt-send-issue-comment-alist issue-id node-id`((text . ,(buffer-string)))))
-        (message "Node successfully updated"))
+    (if (string= local-hash remote-hash)
+        (save-window-excursion
+          (org-gfm-export-as-markdown nil t)
+          (markdown-mode)
+          (replace-regexp "^#" "##" nil (point-min) (point-max))
+          (when (y-or-n-p (format "Send this content as %s with id %s to ticket %s?" type node-id issue-id))
+            (if (eq type 'description)
+                (kpz/yt-send-issue-alist issue-id `((description . ,(buffer-string))))
+              (kpz/yt-send-issue-comment-alist issue-id node-id`((text . ,(buffer-string)))))
+            (message "Node successfully updated"))
+          )
+      (message (format "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
       ))
   )
 
