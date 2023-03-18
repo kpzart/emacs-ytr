@@ -62,13 +62,7 @@
 (defun kpz/yt-query-browse ()
   "Present a list of resolved issues in the minibuffer"
   (interactive)
-  (let* ((query (completing-read "Query: " yt-queries nil nil))
-         (result (kpz/yt-retrieve-query-issues-alist query))
-         (choices (mapcar (lambda (item)
-                           (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
-                         result))
-         (choice (completing-read "Issue: " choices))
-         (choice-id (car (split-string choice ":"))))
+  (let* ((choice-id (kpz/yt-query-shortcode)))
     (browse-url (kpz/yt-issue-url choice-id))
     )
   )
@@ -104,6 +98,16 @@
     :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
                ("Accept" . "application/json")
                ("Content-Type" . "application/json"))
+    :as #'json-read
+    ))
+
+(defun kpz/yt-send-new-comment-alist (issue-id alist)
+  "Send the information in ALIST a new comment for ticket with id ISSUE-ID"
+  (plz 'post (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "/comments/")
+    :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
+               ("Accept" . "application/json")
+               ("Content-Type" . "application/json"))
+    :body (json-encode alist)
     :as #'json-read
     ))
 
@@ -160,7 +164,7 @@
       (org-set-property "YT_ID" .id)
       (org-set-property "YT_TYPE" "description")
       (insert (kpz/yt-md-to-org .description))
-
+      (insert "\n")
       ;; do the comments
       (mapcar (lambda (comment-alist)
                 (insert (concat "** Comment\n\n"))
@@ -169,6 +173,7 @@
                   (org-set-property "YT_ID" .id)
                   (org-set-property "YT_TYPE" "comment")
                   (insert (kpz/yt-md-to-org .text))
+                  (insert "\n")
                   ))
               .comments)
 
@@ -178,16 +183,21 @@
       ))
   )
 
-(defun kpz/yt-query-org ()
-  "Start a query to retrieve an issue and convert it to a temporary org buffer"
-  (interactive)
+(defun kpz/yt-query-shortcode ()
+  "Return a short code from a query"
   (let* ((query (completing-read "Query: " yt-queries nil nil))
          (result (kpz/yt-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
                             (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
                           result))
-         (choice (completing-read "Issue: " choices))
-         (choice-id (car (split-string choice ":"))))
+         (choice (completing-read "Issue: " choices)))
+    (car (split-string choice ":")))
+  )
+
+(defun kpz/yt-query-org ()
+  "Start a query to retrieve an issue and convert it to a temporary org buffer"
+  (interactive)
+  (let ((choice-id (kpz/yt-query-shortcode)))
     (kpz/yt-issue-alist-to-org (kpz/yt-retrieve-issue-alist choice-id) choice-id)
     (org-fold-show-all)
     (goto-char (point-min))
@@ -245,6 +255,20 @@
       (org-next-visible-heading dir)))
   )
 
+(defun kpz/yt-new-comment ()
+  "Send the current subtree as comment to a ticket"
+  (interactive)
+  (let* ((issue-id (kpz/yt-query-shortcode)))
+    (save-window-excursion
+      (org-gfm-export-as-markdown nil t)
+      (markdown-mode)
+      (replace-regexp "^#" "##" nil (point-min) (point-max))
+      (when (y-or-n-p (format "Send this content as comment to ticket %s?" issue-id))
+        (kpz/yt-send-new-comment-alist issue-id `((text . ,(buffer-string))))
+        (message "Node successfully updated"))
+      ))
+  )
+
 (defun kpz/yt-send-node ()
   "Update a node on remote side after editing locally"
   (interactive)
@@ -273,7 +297,7 @@
       (when (y-or-n-p (format "Send this content as %s with id %s to ticket %s?" type node-id issue-id))
         (if (eq type 'description)
             (kpz/yt-send-issue-alist issue-id `((description . ,(buffer-string))))
-          (kpz/yt-send-issue-comment-alist issue-id node-id`((text . ,(buffer-string)))))
+          (kpz/yt-send-issue-comment-alist issue-id node-id `((text . ,(buffer-string)))))
         (message "Node successfully updated"))
       )
 
