@@ -36,6 +36,7 @@
 
 ;;; Code:
 
+(require 'ffap)
 (require 'plz)
 
 (defgroup yt nil "Youtrack integration into emacs")
@@ -211,6 +212,7 @@
   (let ((choice-id (kpz/yt-guess-or-query-shortcode)))
     (kpz/yt-issue-alist-to-org (kpz/yt-retrieve-issue-alist choice-id) choice-id)
     (org-fold-show-all)
+    (kpz/yt-shortcode-buttonize-buffer)
     (goto-char (point-min))
     )
   )
@@ -379,6 +381,7 @@
             (kpz/yt-find-node)
           nil))))
 )
+
 ;; Issue buttons
 
 (define-button-type 'shortcode-button
@@ -394,7 +397,7 @@
   (save-excursion
     (goto-char (point-min))
     (while (re-search-forward "[^A-z0-9-]\\([A-z]+-[0-9]+\\)[^A-z0-9-]" nil t)
-      (make-button (match-beginning 1) (match-end 1) :type 'issue-button))))
+      (make-button (match-beginning 1) (match-end 1) :type 'shortcode-button))))
 
 (add-hook 'org-mode-hook 'kpz/yt-shortcode-buttonize-buffer)
 
