@@ -85,7 +85,7 @@
 ;;  org mode conversion
 (defun kpz/yt-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login)),created,reporter(login)")
+  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login)),created,reporter(login),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary))")
     :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
                ("Accept" . "application/json")
                ("Content-Type" . "application/json"))
@@ -159,6 +159,22 @@
       (org-set-property "YT_ID" .id)
       (org-set-property "YT_TYPE" "ticket")
       (insert (concat "* ".idReadable ": " .summary "\n\n"))
+      (insert "** Links\n\n")
+      (mapcar (lambda (link-alist)
+                (let-alist link-alist
+                  (unless (equal (length .issues) 0)
+                    (insert (format "*** %s\n\n" (cond ((string= .direction "BOTH") (alist-get 'sourceToTarget .linkType))
+                                                       ((string= .direction "INWARD") (alist-get 'targetToSource .linkType))
+                                                       ((string= .direction "OUTWARD") (alist-get 'sourceToTarget .linkType))
+                                                       (t (message "Unknown link direction: %s" .direction)))))
+                    (mapcar (lambda (issue-alist)
+                              (let-alist issue-alist
+                                (insert (format " - *%s*: %s\n" .idReadable .summary))))
+                            .issues)
+                    (insert "\n")
+                    )
+                  ))
+              .links)
       (kpz/yt-org-insert-node .description 'description .id (alist-get 'login .reporter) .created)
       ;; do the comments
       (mapcar (lambda (comment-alist)
@@ -308,7 +324,6 @@
 
 (defun kpz/yt-org-insert-node (content type node-id author created)
   "Insert a comment node at point, type is generic, author is a string, created is a long value"
-  (message "%s" author)
   (insert (format "** %s %s by %s\n\n"
                   (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
                   (kpz/yt-capitalize-first-char (format "%s" type))
