@@ -219,17 +219,18 @@
 
 (defun kpz/yt-max-heading-level ()
   (org-fold-show-all)
-  (setq base-level nil)
   (goto-char (point-min))
   (when (not (org-at-heading-p))
     (org-next-visible-heading 1)
     )
-  (setq last-point 0)
-  (while (and (org-at-heading-p) (/= (point) last-point))
-    (setq base-level (if (and base-level (< base-level (org-current-level))) base-level (org-current-level)))
-    (org-next-visible-heading 1)
+  (let ((base-level nil)
+        (last-point 0))
+    (while (and (org-at-heading-p) (/= (point) last-point))
+      (setq base-level (if (and base-level (< base-level (org-current-level))) base-level (org-current-level)))
+      (org-next-visible-heading 1)
+      )
+    base-level
     )
-  base-level
   )
 
 (defun kpz/yt-first-heading-level ()
