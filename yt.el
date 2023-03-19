@@ -86,7 +86,7 @@
 ;;  org mode conversion
 (defun kpz/yt-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login)),created,reporter(login),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary))")
+  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login)),created,resolved,reporter(login),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary))")
     :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
                ("Accept" . "application/json")
                ("Content-Type" . "application/json"))
@@ -382,6 +382,27 @@
             (kpz/yt-find-node)
           nil))))
 )
+
+;; preview
+
+(defun kpz/yt-sneak-window ()
+  "Display a side window with the description and same basic information on issue with SHORTCODE"
+  (interactive)
+  (with-output-to-temp-buffer "*yt-describe-issue*"
+    (let-alist (kpz/yt-retrieve-issue-alist (kpz/yt-guess-or-query-shortcode))
+      (princ (format "Reporter: %s, Created: %s, Resolved: %s\n\n"
+                     (alist-get 'login .reporter)
+                     (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000))
+                     (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-")))
+      (princ .description)
+      ))
+  )
+
+(defun kpz/yt-sneak-message ()
+  "Display message with the description of the issue with SHORTCODE"
+  (interactive)
+  (message "%s" (alist-get 'description (kpz/yt-retrieve-issue-alist (kpz/yt-guess-or-query-shortcode))))
+  )
 
 ;; Issue buttons
 
