@@ -272,15 +272,22 @@
 (defun kpz/yt-new-comment ()
   "Send the current subtree as comment to a ticket"
   (interactive)
-  (let* ((issue-id (kpz/yt-guess-or-query-shortcode)))
-    (save-window-excursion
-      (org-gfm-export-as-markdown nil t)
-      (markdown-mode)
-      (replace-regexp "^#" "##" nil (point-min) (point-max))
-      (when (y-or-n-p (format "Send this content as comment to ticket %s?" issue-id))
-        (kpz/yt-send-new-comment-alist issue-id `((text . ,(buffer-string))))
-        (message "Node successfully updated"))
-      ))
+  (let* ((issue-id (kpz/yt-guess-or-query-shortcode))
+         (new-node-id (save-window-excursion
+                        (org-gfm-export-as-markdown nil t)
+                        (markdown-mode)
+                        (replace-regexp "^#" "##" nil (point-min) (point-max))
+                        (when (y-or-n-p (format "Send this content as comment to ticket %s?" issue-id))
+                          (alist-get 'id (kpz/yt-send-new-comment-alist issue-id `((text . ,(buffer-string)))))
+                          )
+                        )))
+    (cond (new-node-id
+           (org-set-property "YT_ID" new-node-id)
+           (org-set-property "YT_TYPE" "comment")
+           (unless (org-entry-get (point) "YT_SHORTCODE" t) (org-set-property "YT_SHORTCODE" issue-id))
+           (message "New comment created on %s with node id %s. Call kpz/yt-fetch-node now!" issue-id new-node-id)
+           ))
+    )
   )
 
 (defun kpz/yt-send-node ()
@@ -369,7 +376,9 @@
          )
     ;; markiere den subtree und ersetze ihn durch das geholte, setze die properties
     (org-cut-subtree)
-    (kpz/yt-org-insert-node content type node-id author created))
+    (kpz/yt-org-insert-node content type node-id author created)
+    (unless (org-entry-get (point) "YT_SHORTCODE" t) (org-set-property "YT_SHORTCODE" issue-id))
+    )
   )
 
 (defun kpz/yt-find-node ()
