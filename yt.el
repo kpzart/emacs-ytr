@@ -403,9 +403,11 @@
 (add-hook 'org-mode-hook 'kpz/yt-shortcode-buttonize-buffer)
 
 ;; Be Smart
+(add-to-list 'ffap-string-at-point-mode-alist '(yt "0-9A-z-" "" ""))
+
 (defun kpz/yt-shortcode-from-point ()
   "Return the shortcode at point or nil if there is none"
-  (let ((candidate (ffap-string-at-point)))
+  (let ((candidate (ffap-string-at-point 'yt)))
     (if (string-match-p "[A-z]+-[0-9]+" candidate)
         candidate
       nil))
