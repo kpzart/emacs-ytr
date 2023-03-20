@@ -364,16 +364,24 @@
     (kpz/yt-org-insert-node content (org-current-level) type issue-id node-id author created)
     )
   )
+(defun kpz/yt-org (shortcode)
+  "Retrieve an issue and convert it to a temporary org buffer"
+  (kpz/yt-issue-alist-to-org (kpz/yt-retrieve-issue-alist shortcode) shortcode)
+  (org-fold-show-all)
+  (kpz/yt-shortcode-buttonize-buffer)
+  (goto-char (point-min))
+  )
+
+(defun kpz/yt-query-org ()
+  "Retrieve an issue and convert it to a temporary org buffer"
+  (interactive)
+  (kpz/yt-org (kpz/yt-query-shortcode))
+  )
 
 (defun kpz/yt-smart-query-org ()
   "Retrieve an issue and convert it to a temporary org buffer"
   (interactive)
-  (let ((choice-id (kpz/yt-guess-or-query-shortcode)))
-    (kpz/yt-issue-alist-to-org (kpz/yt-retrieve-issue-alist choice-id) choice-id)
-    (org-fold-show-all)
-    (kpz/yt-shortcode-buttonize-buffer)
-    (goto-char (point-min))
-    )
+  (kpz/yt-org (kpz/yt-guess-or-query-shortcode))
   )
 
 ;; * preview
@@ -417,22 +425,15 @@
 (add-hook 'org-mode-hook 'kpz/yt-shortcode-buttonize-buffer)
 
 ;; * interactive
-(defun kpz/yt-smart-query-browse ()
-  "Browse an issue. Be smart which one."
-  (interactive)
-  (let ((issue (kpz/yt-guess-shortcode)))
-    (if issue
-        (browse-url (kpz/yt-issue-url issue))
-      (let* ((query (completing-read "Query: " yt-queries nil nil))
-             (result (kpz/yt-retrieve-query-issues-alist query))
-             (choices (mapcar (lambda (item)
-                                (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
-                              result))
-             (choice (completing-read "Issue: " choices))
-             (choice-id (car (split-string choice ":"))))
-        (browse-url (kpz/yt-issue-url choice-id))))))
-
 (defun kpz/yt-query-browse ()
+  "Open an issue in the webbrowser"
+  (interactive)
+  (let* ((choice-id (kpz/yt-query-shortcode)))
+    (browse-url (kpz/yt-issue-url choice-id))
+    )
+  )
+
+(defun kpz/yt-smart-query-browse ()
   "Open an issue in the webbrowser"
   (interactive)
   (let* ((choice-id (kpz/yt-guess-or-query-shortcode)))
@@ -454,7 +455,6 @@
     (browse-url (kpz/yt-issue-url choice-id))
     )
   )
-
 
 (provide 'yt)
 ;;; yt.el ends here
