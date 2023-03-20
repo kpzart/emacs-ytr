@@ -38,6 +38,7 @@
 
 (require 'ffap)
 (require 'plz)
+(require 'helm)
 
 (defgroup yt nil "Youtrack integration into emacs")
 
@@ -46,6 +47,8 @@
 (defcustom yt-access-token "" "Your access token" :type 'string :group 'yt)
 
 (defcustom yt-queries () "Define your Queries here" :type '(repeat string) :group 'yt)
+
+(defcustom yt-plz-debug nil "Print plz debug messages if non nil" :type 'bool :group 'yt)
 
 ;; * urls and shortcodes
 (defun kpz/yt-issue-url (shortcode)
@@ -101,13 +104,14 @@
                      :body body
                      :connect-timeout 10
                      )))
-    (message "YT Request: %s" request)
-    (message "YT Response: %s" response)
+    (cond (yt-plz-debug
+           (message "YT Request: %s" request)
+           (message "YT Response: %s" response)))
     response))
 
 (defun kpz/yt-retrieve-query-issues-alist (query)
   "Retrieve list of issues by query"
-  (kpz/yt-plz 'get (concat yt-baseurl "/api/issues?fields=idReadable,summary&query=" (url-hexify-string query))))
+  (kpz/yt-plz 'get (concat yt-baseurl "/api/issues?fields=idReadable,summary,description,reporter,created,resolved&query=" (url-hexify-string query))))
 
 (defun kpz/yt-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
@@ -386,23 +390,24 @@
 
 ;; * preview
 
-(defun kpz/yt-sneak-window ()
+(defun kpz/yt-sneak (issue-alist)
+  (let-alist issue-alist
+    (princ (format "%s: %s\n" .idReadable .summary))
+    (princ (format "Reporter: %s, Created: %s, Resolved: %s\n"
+                   (alist-get 'login .reporter)
+                   (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000))
+                   (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-")))
+    (princ "------------------------\n")
+    (princ .description)))
+
+(defun kpz/yt-sneak-window (issue-alist)
+  (with-output-to-temp-buffer "*yt-describe-issue*"
+    (kpz/yt-sneak issue-alist)))
+
+(defun kpz/yt-smart-query-sneak ()
   "Display a side window with the description and same basic information on issue with SHORTCODE"
   (interactive)
-  (with-output-to-temp-buffer "*yt-describe-issue*"
-    (let-alist (kpz/yt-retrieve-issue-alist (kpz/yt-guess-or-query-shortcode))
-      (princ (format "Reporter: %s, Created: %s, Resolved: %s\n\n"
-                     (alist-get 'login .reporter)
-                     (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000))
-                     (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-")))
-      (princ .description)
-      ))
-  )
-
-(defun kpz/yt-sneak-message ()
-  "Display message with the description of the issue with SHORTCODE"
-  (interactive)
-  (message "%s" (alist-get 'description (kpz/yt-retrieve-issue-alist (kpz/yt-guess-or-query-shortcode))))
+  (kpz/yt-sneak-window (kpz/yt-retrieve-issue-alist (kpz/yt-guess-or-query-shortcode)))
   )
 
 ;; * Issue buttons
@@ -453,6 +458,32 @@
          (choice (completing-read "Issue: " choices))
          (choice-id (car (split-string choice ":"))))
     (browse-url (kpz/yt-issue-url choice-id))
+    )
+  )
+
+;; * helm
+
+(defun kpz/yt-helm-query ()
+  "Return a shortcode using helm"
+  (interactive)
+  (let* ((query (completing-read "Query: " yt-queries nil nil))
+         (result (kpz/yt-retrieve-query-issues-alist query))
+         (choices (mapcar (lambda (issue-alist)
+                            (let-alist issue-alist
+                              (cons (format "%s: %s" .idReadable .summary) issue-alist))
+                              )
+                          result))
+         )
+    (helm :sources (helm-build-sync-source "yt-issues"
+                     :candidates choices
+                     :action '(("Open in browser" . (lambda (issue-alist) (browse-url (kpz/yt-issue-url (alist-get 'idReadable issue-alist)))))
+                               ("Open in org buffer" . (lambda (issue-alist) (kpz/yt-org (alist-get 'idReadable issue-alist)))))
+                     :must-match 'ignore
+                     ;; :persistent-action (lambda (shortcode) (message "%s" shortcode))
+                     :persistent-action 'kpz/yt-sneak-window
+                     )
+          :buffer "*helm yt*")
+    ;; (car (split-string choice ":"))
     )
   )
 
