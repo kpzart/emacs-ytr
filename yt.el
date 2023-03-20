@@ -94,11 +94,12 @@
 (defun kpz/yt-plz (method request &optional body)
   "Generic plz request method"
   (let* ((response (plz method request
-                     :headers '(("Authorization" . (concat "Bearer " yt-access-token))
+                     :headers `(("Authorization" . ,(concat "Bearer " yt-access-token))
                                 ("Accept" . "application/json")
                                 ("Content-Type" . "application/json"))
                      :as #'json-read
                      :body body
+                     :connect-timeout 10
                      )))
     (message "YT Request: %s" request)
     (message "YT Response: %s" response)
