@@ -47,93 +47,90 @@
 
 (defcustom yt-queries () "Define your Queries here" :type '(repeat string) :group 'yt)
 
-(defun kpz/yt-retrieve-query-issues-alist (query)
-  "Retrieve list of issues by query"
-  (plz 'get (concat yt-baseurl "/api/issues?fields=idReadable,summary&query=" (url-hexify-string query))
-    :headers `(("Authorization" . ,(concat "Bearer " yt-access-token))
-               ("Accept" . "application/json")
-               ("Content-Type" . "application/json"))
-    :as #'json-read
-    ))
-
+;; * urls and shortcodes
 (defun kpz/yt-issue-url (shortcode)
   "Return the URL for a issue given by shortcode"
   (concat yt-baseurl "/issue/" shortcode))
 
-(defun kpz/yt-query-browse ()
-  "Open an issue in the webbrowser"
-  (interactive)
-  (let* ((choice-id (kpz/yt-guess-or-query-shortcode)))
-    (browse-url (kpz/yt-issue-url choice-id))
-    )
-  )
-
-(defun kpz/yt-query-refine-browse ()
-  "Present a list of resolved issues in the minibuffer"
-  (interactive)
-  (let* ((query-orig (completing-read "Query: " yt-queries nil t))
-         (query (read-string "Refine query: " query-orig nil))
+(defun kpz/yt-query-shortcode ()
+  "Return a shortcode from a query"
+  (let* ((query (completing-read "Query: " yt-queries nil nil))
          (result (kpz/yt-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
                             (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
                           result))
-         (choice (completing-read "Issue: " choices))
-         (choice-id (car (split-string choice ":"))))
-    (browse-url (kpz/yt-issue-url choice-id))
-    )
+         (choice (completing-read "Issue: " choices)))
+    (car (split-string choice ":")))
   )
 
-;;  org mode conversion
+(add-to-list 'ffap-string-at-point-mode-alist '(yt "0-9A-z-" "" ""))
+
+(defun kpz/yt-shortcode-from-point ()
+  "Return the shortcode at point or nil if there is none"
+  (let ((candidate (ffap-string-at-point 'yt)))
+    (if (string-match-p "[A-z]+-[0-9]+" candidate)
+        candidate
+      nil))
+  )
+
+(defun kpz/yt-shortcode-from-org-property ()
+  "Return the shortcode defined by an org property YT_SHORTCODE or nil"
+  (org-entry-get (point) "YT_SHORTCODE" t))
+
+(defun kpz/yt-guess-shortcode ()
+  "Return a shortcode from current context."
+  (let ((issue (kpz/yt-shortcode-from-point)))
+    (if issue issue
+      (let ((issue (kpz/yt-shortcode-from-org-property)))
+        (if issue issue nil)))))
+
+(defun kpz/yt-guess-or-query-shortcode ()
+  "Guess shortcode on context or start a query."
+  (let ((guess (kpz/yt-guess-shortcode)))
+    (if guess guess (kpz/yt-query-shortcode)))
+  )
+
+;; * api
+(defun kpz/yt-plz (method request &optional body)
+  "Generic plz request method"
+  (let* ((response (plz method request
+                     :headers '(("Authorization" . (concat "Bearer " yt-access-token))
+                                ("Accept" . "application/json")
+                                ("Content-Type" . "application/json"))
+                     :as #'json-read
+                     :body body
+                     )))
+    (message "YT Request: %s" request)
+    (message "YT Response: %s" response)
+    response))
+
+(defun kpz/yt-retrieve-query-issues-alist (query)
+  "Retrieve list of issues by query"
+  (kpz/yt-plz 'get (concat yt-baseurl "/api/issues?fields=idReadable,summary&query=" (url-hexify-string query))))
+
 (defun kpz/yt-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login)),created,resolved,reporter(login),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary))")
-    :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
-               ("Accept" . "application/json")
-               ("Content-Type" . "application/json"))
-    :as #'json-read
-    ))
+  (kpz/yt-plz 'get (concat yt-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login)),created,resolved,reporter(login),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary))")))
 
 (defun kpz/yt-retrieve-issue-comment-alist (issue-id comment-id)
   "Retrieve information concering the given issue and return an alist."
-  (plz 'get (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,author(login)")
-    :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
-               ("Accept" . "application/json")
-               ("Content-Type" . "application/json"))
-    :as #'json-read
-    ))
+  (kpz/yt-plz 'get (concat yt-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,author(login)")))
 
 (defun kpz/yt-send-new-comment-alist (issue-id alist)
   "Send the information in ALIST a new comment for ticket with id ISSUE-ID"
-  (plz 'post (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "/comments/")
-    :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
-               ("Accept" . "application/json")
-               ("Content-Type" . "application/json"))
-    :body (json-encode alist)
-    :as #'json-read
-    ))
+  (kpz/yt-plz 'post (concat yt-baseurl "/api/issues/" issue-id "/comments/") (json-encode alist)))
 
 (defun kpz/yt-send-issue-comment-alist (issue-id comment-id alist)
   "Send the information in ALIST for a remote update of an issue comment with id ISSUE"
-  (plz 'post (concat "https://matlantis.youtrack.cloud/api/issues/" issue-id "/comments/" comment-id "?fields=text")
-    :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
-               ("Accept" . "application/json")
-               ("Content-Type" . "application/json"))
-    :body (json-encode alist)
-    :as #'json-read
-    ))
+  (kpz/yt-plz 'post (concat yt-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=text") (json-encode alist)))
 
 (defun kpz/yt-send-issue-alist (issue alist)
   "Send the information in ALIST for a remote update of issue with id ISSUE"
-  (plz 'post (concat "https://matlantis.youtrack.cloud/api/issues/" issue "?fields=description")
-    :headers '(("Authorization" . "Bearer perm:cm9vdA==.NDctMA==.4yaPBDqQTSnPMdhzK6C6K8yMenpT7D")
-               ("Accept" . "application/json")
-               ("Content-Type" . "application/json"))
-    :body (json-encode alist)
-    :as #'json-read
-    ))
+  (kpz/yt-plz 'post (concat yt-baseurl "/api/issues/" issue "?fields=description") (json-encode alist)))
 
-(defun kpz/yt-md-to-org (input)
-  "Convert a markdown string to org mode using pandoc"
+;; * org mode conversion
+(defun kpz/yt-md-to-org (input level)
+  "Convert a markdown string to org mode using pandoc. LEVEL indicates the level of top level headings in org and defaults to 3."
   (save-current-buffer
     (set-buffer (get-buffer-create "*yt-convert*"))
     (setf (buffer-string) "")
@@ -142,7 +139,7 @@
                              (format "pandoc -f gfm -t org")
                              nil t "*yt-convert-error*")
     (org-mode)
-    (kpz/yt-demote-org-headings 3)
+    (kpz/yt-demote-org-headings (or level 3))
     (buffer-string)
     )
 )
@@ -187,34 +184,6 @@
       (org-unindent-buffer)
       (switch-to-buffer bufname)
       ))
-  )
-
-(defun kpz/yt-query-shortcode ()
-  "Return a short code from a query"
-  (let* ((query (completing-read "Query: " yt-queries nil nil))
-         (result (kpz/yt-retrieve-query-issues-alist query))
-         (choices (mapcar (lambda (item)
-                            (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
-                          result))
-         (choice (completing-read "Issue: " choices)))
-    (car (split-string choice ":")))
-  )
-
-(defun kpz/yt-guess-or-query-shortcode ()
-  "Guess shortcode on context or start a query."
-  (let ((guess (kpz/yt-guess-shortcode)))
-    (if guess guess (kpz/yt-query-shortcode)))
-  )
-
-(defun kpz/yt-smart-query-org ()
-  "Retrieve an issue and convert it to a temporary org buffer"
-  (interactive)
-  (let ((choice-id (kpz/yt-guess-or-query-shortcode)))
-    (kpz/yt-issue-alist-to-org (kpz/yt-retrieve-issue-alist choice-id) choice-id)
-    (org-fold-show-all)
-    (kpz/yt-shortcode-buttonize-buffer)
-    (goto-char (point-min))
-    )
   )
 
 (defun kpz/yt-max-heading-level ()
@@ -269,6 +238,42 @@
       (org-next-visible-heading dir)))
   )
 
+(defun kpz/yt-capitalize-first-char (&optional string)
+  "Capitalize only the first character of the input STRING."
+  (when (and string (> (length string) 0))
+    (let ((first-char (substring string nil 1))
+          (rest-str   (substring string 1)))
+      (concat (capitalize first-char) rest-str))))
+
+(defun kpz/yt-org-insert-node (content level type node-id author created)
+  "Insert a comment node at point, level is that of the node, type is generic, author is a string, created is a long value"
+  (insert (format "%s %s %s by %s\n\n"
+                  (make-string level ?*)
+                  (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
+                  (kpz/yt-capitalize-first-char (format "%s" type))
+                  author
+                  ))
+  (insert (kpz/yt-md-to-org content (+ 1 level)))
+  (insert "\n")
+  (previous-line)
+  (org-set-property "YT_CONTENT_HASH" (sha1 content))
+  (org-set-property "YT_ID" node-id)
+  (org-set-property "YT_TYPE" (format "%s" type))
+  (next-line)
+  )
+
+(defun kpz/yt-find-node ()
+  "Find the parent heading with a YT_TYPE property, sets the point and returns the type. If property is not found in buffer returns nil."
+  (when (or (org-at-heading-p) (org-back-to-heading))
+    (let ((type (org-entry-get (point) "YT_TYPE")))
+      (if (or (string= type "comment") (string= type "description"))
+          type
+        (if (org-up-heading-safe)
+            (kpz/yt-find-node)
+          nil))))
+  )
+
+;; * org interactive
 (defun kpz/yt-new-comment ()
   "Send the current subtree as comment to a ticket"
   (interactive)
@@ -325,29 +330,6 @@
     (kpz/yt-fetch-node))
   )
 
-(defun kpz/yt-capitalize-first-char (&optional string)
-  "Capitalize only the first character of the input STRING."
-  (when (and string (> (length string) 0))
-    (let ((first-char (substring string nil 1))
-          (rest-str   (substring string 1)))
-      (concat (capitalize first-char) rest-str))))
-
-(defun kpz/yt-org-insert-node (content type node-id author created)
-  "Insert a comment node at point, type is generic, author is a string, created is a long value"
-  (insert (format "** %s %s by %s\n\n"
-                  (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
-                  (kpz/yt-capitalize-first-char (format "%s" type))
-                  author
-                  ))
-  (insert (kpz/yt-md-to-org content))
-  (insert "\n")
-  (previous-line)
-  (org-set-property "YT_CONTENT_HASH" (sha1 content))
-  (org-set-property "YT_ID" node-id)
-  (org-set-property "YT_TYPE" (format "%s" type))
-  (next-line)
-  )
-
 (defun kpz/yt-fetch-node ()
   "Update a local node withs its remote content"
   (interactive)
@@ -376,23 +358,23 @@
          )
     ;; markiere den subtree und ersetze ihn durch das geholte, setze die properties
     (org-cut-subtree)
-    (kpz/yt-org-insert-node content type node-id author created)
+    (kpz/yt-org-insert-node content (org-current-level) type node-id author created)
     (unless (org-entry-get (point) "YT_SHORTCODE" t) (org-set-property "YT_SHORTCODE" issue-id))
     )
   )
 
-(defun kpz/yt-find-node ()
-  "Find the parent heading with a YT_TYPE property, sets the point and returns the type. If property is not found in buffer returns nil."
-  (when (or (org-at-heading-p) (org-back-to-heading))
-    (let ((type (org-entry-get (point) "YT_TYPE")))
-      (if (or (string= type "comment") (string= type "description"))
-          type
-        (if (org-up-heading-safe)
-            (kpz/yt-find-node)
-          nil))))
-)
+(defun kpz/yt-smart-query-org ()
+  "Retrieve an issue and convert it to a temporary org buffer"
+  (interactive)
+  (let ((choice-id (kpz/yt-guess-or-query-shortcode)))
+    (kpz/yt-issue-alist-to-org (kpz/yt-retrieve-issue-alist choice-id) choice-id)
+    (org-fold-show-all)
+    (kpz/yt-shortcode-buttonize-buffer)
+    (goto-char (point-min))
+    )
+  )
 
-;; preview
+;; * preview
 
 (defun kpz/yt-sneak-window ()
   "Display a side window with the description and same basic information on issue with SHORTCODE"
@@ -413,7 +395,7 @@
   (message "%s" (alist-get 'description (kpz/yt-retrieve-issue-alist (kpz/yt-guess-or-query-shortcode))))
   )
 
-;; Issue buttons
+;; * Issue buttons
 
 (define-button-type 'shortcode-button
   'follow-link t
@@ -432,28 +414,7 @@
 
 (add-hook 'org-mode-hook 'kpz/yt-shortcode-buttonize-buffer)
 
-;; Be Smart
-(add-to-list 'ffap-string-at-point-mode-alist '(yt "0-9A-z-" "" ""))
-
-(defun kpz/yt-shortcode-from-point ()
-  "Return the shortcode at point or nil if there is none"
-  (let ((candidate (ffap-string-at-point 'yt)))
-    (if (string-match-p "[A-z]+-[0-9]+" candidate)
-        candidate
-      nil))
-  )
-
-(defun kpz/yt-shortcode-from-org-property ()
-  "Return the shortcode defined by an org property YT_SHORTCODE or nil"
-  (org-entry-get (point) "YT_SHORTCODE" t))
-
-(defun kpz/yt-guess-shortcode ()
-  "Return a shortcode from current context."
-  (let ((issue (kpz/yt-shortcode-from-point)))
-    (if issue issue
-      (let ((issue (kpz/yt-shortcode-from-org-property)))
-        (if issue issue nil)))))
-
+;; * interactive
 (defun kpz/yt-smart-query-browse ()
   "Browse an issue. Be smart which one."
   (interactive)
@@ -468,6 +429,30 @@
              (choice (completing-read "Issue: " choices))
              (choice-id (car (split-string choice ":"))))
         (browse-url (kpz/yt-issue-url choice-id))))))
+
+(defun kpz/yt-query-browse ()
+  "Open an issue in the webbrowser"
+  (interactive)
+  (let* ((choice-id (kpz/yt-guess-or-query-shortcode)))
+    (browse-url (kpz/yt-issue-url choice-id))
+    )
+  )
+
+(defun kpz/yt-query-refine-browse ()
+  "Present a list of resolved issues in the minibuffer"
+  (interactive)
+  (let* ((query-orig (completing-read "Query: " yt-queries nil t))
+         (query (read-string "Refine query: " query-orig nil))
+         (result (kpz/yt-retrieve-query-issues-alist query))
+         (choices (mapcar (lambda (item)
+                            (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
+                          result))
+         (choice (completing-read "Issue: " choices))
+         (choice-id (car (split-string choice ":"))))
+    (browse-url (kpz/yt-issue-url choice-id))
+    )
+  )
+
 
 (provide 'yt)
 ;;; yt.el ends here
