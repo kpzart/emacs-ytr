@@ -174,11 +174,11 @@
                     )
                   ))
               .links)
-      (kpz/yt-org-insert-node .description 'description .id (alist-get 'login .reporter) .created)
+      (kpz/yt-org-insert-node .description 2 'description shortcode .id (alist-get 'login .reporter) .created)
       ;; do the comments
       (mapcar (lambda (comment-alist)
                 (let-alist comment-alist
-                  (kpz/yt-org-insert-node .text 'comment .id (alist-get 'login .author) .created)))
+                  (kpz/yt-org-insert-node .text 2 'comment shortcode .id (alist-get 'login .author) .created)))
               .comments)
 
       ;; postprocess
@@ -246,7 +246,7 @@
           (rest-str   (substring string 1)))
       (concat (capitalize first-char) rest-str))))
 
-(defun kpz/yt-org-insert-node (content level type node-id author created)
+(defun kpz/yt-org-insert-node (content level type issue-id node-id author created)
   "Insert a comment node at point, level is that of the node, type is generic, author is a string, created is a long value"
   (insert (format "%s %s %s by %s\n\n"
                   (make-string level ?*)
@@ -260,6 +260,8 @@
   (org-set-property "YT_CONTENT_HASH" (sha1 content))
   (org-set-property "YT_ID" node-id)
   (org-set-property "YT_TYPE" (format "%s" type))
+  (unless (string= issue-id (org-entry-get (point) "YT_SHORTCODE" t))
+    (org-set-property "YT_SHORTCODE" issue-id))
   (next-line)
   )
 
@@ -359,8 +361,7 @@
          )
     ;; markiere den subtree und ersetze ihn durch das geholte, setze die properties
     (org-cut-subtree)
-    (kpz/yt-org-insert-node content (org-current-level) type node-id author created)
-    (unless (org-entry-get (point) "YT_SHORTCODE" t) (org-set-property "YT_SHORTCODE" issue-id))
+    (kpz/yt-org-insert-node content (org-current-level) type issue-id node-id author created)
     )
   )
 
