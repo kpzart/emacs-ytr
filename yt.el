@@ -44,7 +44,7 @@
 
 (defcustom yt-baseurl "https://somewhere.youtrack.cloud" "Base url of your youtrack server" :type 'string :group 'yt)
 
-(defcustom yt-access-token "" "Your access token" :type 'string :group 'yt)
+(defcustom yt-access-token "" "Your access token. Maybe a string or function" :type '(choice function string) :group 'yt)
 
 (defcustom yt-queries () "Define your Queries here" :type '(repeat string) :group 'yt)
 
@@ -97,7 +97,10 @@
 (defun kpz/yt-plz (method request &optional body)
   "Generic plz request method"
   (let* ((response (plz method request
-                     :headers `(("Authorization" . ,(concat "Bearer " yt-access-token))
+                     :headers `(("Authorization" . ,(concat "Bearer "
+                                                            (if (functionp yt-access-token)
+                                                                (funcall yt-access-token)
+                                                              (format "%s" yt-access-token))))
                                 ("Accept" . "application/json")
                                 ("Content-Type" . "application/json"))
                      :as #'json-read
