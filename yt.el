@@ -261,10 +261,10 @@
                   (kpz/yt-capitalize-first-char (format "%s" type))
                   author
                   ))
-  (insert (kpz/yt-md-to-org content (+ 1 level)))
+  (when content (insert (kpz/yt-md-to-org content (+ 1 level))))
   (insert "\n")
   (previous-line)
-  (org-set-property "YT_CONTENT_HASH" (sha1 content))
+  (org-set-property "YT_CONTENT_HASH" (if content (sha1 content) ""))
   (org-set-property "YT_ID" node-id)
   (org-set-property "YT_TYPE" (format "%s" type))
   (unless (string= issue-id (org-entry-get (point) "YT_SHORTCODE" t))
