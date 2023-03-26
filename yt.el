@@ -465,11 +465,10 @@
   )
 
 ;; * helm
-
-(defun kpz/yt-helm-query ()
+(defun kpz/yt-helm-query (&optional defaultquery)
   "Return a shortcode using helm"
   (interactive)
-  (let* ((query (completing-read "Query: " yt-queries nil nil))
+  (let* ((query (completing-read "Query: " yt-queries nil nil defaultquery))
          (result (kpz/yt-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (issue-alist)
                             (let-alist issue-alist
@@ -477,17 +476,23 @@
                               )
                           result))
          )
-    (helm :sources (helm-build-sync-source "yt-issues"
-                     :candidates choices
-                     :action '(("Open in browser" . (lambda (issue-alist) (browse-url (kpz/yt-issue-url (alist-get 'idReadable issue-alist)))))
-                               ("Open in org buffer" . (lambda (issue-alist) (kpz/yt-org (alist-get 'idReadable issue-alist))))
-                               ("Back to queries" . (lambda (ignored) (kpz/yt-helm-query))))
-                     :must-match 'ignore
-                     ;; :persistent-action (lambda (shortcode) (message "%s" shortcode))
-                     :persistent-action 'kpz/yt-sneak-window
-                     )
-          :buffer "*helm yt*")
-    ;; (car (split-string choice ":"))
+    (if choices
+        (helm :sources (helm-build-sync-source "yt-issues"
+                         :candidates choices
+                         :action '(("Open in browser" . (lambda (issue-alist) (browse-url (kpz/yt-issue-url (alist-get 'idReadable issue-alist)))))
+                                   ("Open in org buffer" . (lambda (issue-alist) (kpz/yt-org (alist-get 'idReadable issue-alist))))
+                                   ("Back to queries" . (lambda (ignored) (kpz/yt-helm-query query))))
+                         :prompt "Issue: "
+                         :must-match 'ignore
+                         :persistent-action 'kpz/yt-sneak-window
+                         :keymap (let ((map (make-sparse-keymap)))
+                                   (set-keymap-parent map helm-map)
+                                   (define-key map (kbd "M-q") (lambda () (interactive) (kpz/yt-helm-query query)))
+                                   map)
+                         :cleanup (lambda () (kill-matching-buffers "*yt-describe-issue*" nil t))
+                         )
+              :buffer "*helm yt*")
+      (message "No Issues found."))
     )
   )
 
