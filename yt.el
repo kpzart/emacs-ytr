@@ -482,7 +482,6 @@
                          :action '(("Open in browser" . (lambda (issue-alist) (browse-url (kpz/yt-issue-url (alist-get 'idReadable issue-alist)))))
                                    ("Open in org buffer" . (lambda (issue-alist) (kpz/yt-org (alist-get 'idReadable issue-alist))))
                                    ("Back to queries" . (lambda (ignored) (kpz/yt-helm-query query))))
-                         :prompt "Issue: "
                          :must-match 'ignore
                          :persistent-action 'kpz/yt-sneak-window
                          :keymap (let ((map (make-sparse-keymap)))
