@@ -298,7 +298,7 @@
                         (org-gfm-export-as-markdown nil t)
                         (markdown-mode)
                         (replace-regexp "^#" "##" nil (point-min) (point-max))
-                        (when (y-or-n-p (format "Send this content as comment to ticket %s?" issue-id))
+                        (when (y-or-n-p (format "Send this content as new comment to ticket %s?" issue-id))
                           (alist-get 'id (kpz/yt-send-new-comment-alist issue-id `((text . ,(buffer-string)))))
                           )
                         )))
@@ -314,7 +314,7 @@
     )
   )
 
-(defun kpz/yt-send-node ()
+(defun kpz/yt-update-remote-node ()
   "Update a node on remote side after editing locally"
   (interactive)
   (let* ((type-str (kpz/yt-find-node))
@@ -334,21 +334,28 @@
     (when (not (string= local-hash remote-hash))
         (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
 
-    (save-window-excursion
-      (org-gfm-export-as-markdown nil t)
-      (markdown-mode)
-      (replace-regexp "^#" "##" nil (point-min) (point-max))
-      (when (y-or-n-p (format "Send this content as %s with id %s to ticket %s?" type node-id issue-id))
-        (if (eq type 'description)
-            (kpz/yt-send-issue-alist issue-id `((description . ,(buffer-string))))
-          (kpz/yt-send-issue-comment-alist issue-id node-id `((text . ,(buffer-string)))))
-        (message "Node successfully updated"))
-      )
-
-    (kpz/yt-fetch-node))
+    (when (save-window-excursion
+            (org-gfm-export-as-markdown nil t)
+            (markdown-mode)
+            (replace-regexp "^#" "##" nil (point-min) (point-max))
+            (when (y-or-n-p (format "Send this content as %s with id %s to ticket %s?" type node-id issue-id))
+              (if (eq type 'description)
+                  (kpz/yt-send-issue-alist issue-id `((description . ,(buffer-string))))
+                (kpz/yt-send-issue-comment-alist issue-id node-id `((text . ,(buffer-string)))))
+              (message "Node successfully updated"))
+            )
+        (kpz/yt-fetch-remote-node)))
   )
 
-(defun kpz/yt-fetch-node ()
+(defun kpz/yt-send-node ()
+  "Create a new comment or update the node, depending on context."
+  (interactive)
+  (if (org-entry-get (point) "YT_TYPE" t)
+      (kpz/yt-update-remote-node)
+    (kpz/yt-new-comment))
+  )
+
+(defun kpz/yt-fetch-remote-node ()
   "Update a local node withs its remote content"
   (interactive)
   (let* ((type-str (kpz/yt-find-node))
