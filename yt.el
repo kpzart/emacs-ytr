@@ -503,6 +503,7 @@
                          :keymap (let ((map (make-sparse-keymap)))
                                    (set-keymap-parent map helm-map)
                                    (define-key map (kbd "M-q") (lambda () (interactive) (helm-run-after-exit 'kpz/yt-helm-query query)))
+                                   (define-key map (kbd "M-Q") (lambda () (interactive) (helm-run-after-exit 'kpz/yt-helm-query)))
                                    (define-key map (kbd "M-w") (lambda () (interactive) (helm-run-after-exit 'browse-url (kpz/yt-query-url query))))
                                    map)
                          :cleanup (lambda () (kill-matching-buffers "*yt-describe-issue*" nil t))
