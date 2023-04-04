@@ -55,6 +55,10 @@
   "Return the URL for a issue given by shortcode"
   (concat yt-baseurl "/issue/" shortcode))
 
+(defun kpz/yt-query-url (query)
+  "Return the URL for a query"
+  (concat yt-baseurl "/issues?q=" query))
+
 (defun kpz/yt-query-shortcode ()
   "Return a shortcode from a query"
   (let* ((query (completing-read "Query: " yt-queries nil nil))
@@ -479,13 +483,13 @@
         (helm :sources (helm-build-sync-source "yt-issues"
                          :candidates choices
                          :action '(("Open in browser" . (lambda (issue-alist) (browse-url (kpz/yt-issue-url (alist-get 'idReadable issue-alist)))))
-                                   ("Open in org buffer" . (lambda (issue-alist) (kpz/yt-org (alist-get 'idReadable issue-alist))))
-                                   ("Back to queries" . (lambda (ignored) (kpz/yt-helm-query query))))
+                                   ("Open in org buffer" . (lambda (issue-alist) (kpz/yt-org (alist-get 'idReadable issue-alist)))))
                          :must-match 'ignore
                          :persistent-action 'kpz/yt-sneak-window
                          :keymap (let ((map (make-sparse-keymap)))
                                    (set-keymap-parent map helm-map)
-                                   (define-key map (kbd "M-q") (lambda () (interactive) (kpz/yt-helm-query query)))
+                                   (define-key map (kbd "M-q") (lambda () (interactive) (helm-run-after-exit 'kpz/yt-helm-query query)))
+                                   (define-key map (kbd "M-w") (lambda () (interactive) (helm-run-after-exit 'browse-url (kpz/yt-query-url query))))
                                    map)
                          :cleanup (lambda () (kill-matching-buffers "*yt-describe-issue*" nil t))
                          )
