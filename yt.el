@@ -316,11 +316,10 @@
                    (user-error (format "Unknown node type: %s" type-str)))))
          (issue-id (org-entry-get (point) "YT_SHORTCODE" t))
          (node-id (org-entry-get (point) "YT_ID" t))
-         (remote-hash
-          (sha1
-           (if (eq type 'description)
-               (alist-get 'description (kpz/yt-retrieve-issue-alist issue-id))
-             (alist-get 'text (kpz/yt-retrieve-issue-comment-alist issue-id node-id)))))
+         (content (if (eq type 'description)
+                      (alist-get 'description (kpz/yt-retrieve-issue-alist issue-id))
+                    (alist-get 'text (kpz/yt-retrieve-issue-comment-alist issue-id node-id))))
+         (remote-hash (if content (sha1 content) ""))
          (local-hash (org-entry-get (point) "YT_CONTENT_HASH" t))
          )
     (when (not (string= local-hash remote-hash))
