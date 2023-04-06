@@ -57,7 +57,7 @@
 
 (defun kpz/yt-query-url (query)
   "Return the URL for a query"
-  (concat yt-baseurl "/issues?q=" query))
+  (concat yt-baseurl "/issues?q=" (url-hexify-string query)))
 
 (defun kpz/yt-query-shortcode ()
   "Return a shortcode from a query"
