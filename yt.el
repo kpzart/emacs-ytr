@@ -168,7 +168,6 @@
       (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
       (org-set-property "YT_SHORTCODE" shortcode)
       (org-set-property "YT_ID" .id)
-      (org-set-property "YT_TYPE" "ticket")
       (insert (concat "* ".idReadable ": " .summary "\n\n"))
       (insert "** Links\n\n")
       (mapcar (lambda (link-alist)
