@@ -259,21 +259,24 @@
 
 (defun kpz/yt-org-insert-node (content level type issue-id node-id author created)
   "Insert a comment node at point, level is that of the node, type is generic, author is a string, created is a long value"
-  (insert (format "%s %s %s by %s\n\n"
-                  (make-string level ?*)
-                  (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
-                  (kpz/yt-capitalize-first-char (format "%s" type))
-                  author
-                  ))
-  (org-set-property "YT_CONTENT_HASH" (if content (sha1 content) ""))
-  (org-set-property "YT_ID" node-id)
-  (org-set-property "YT_TYPE" (format "%s" type))
-  (when content (insert (kpz/yt-md-to-org content (+ 1 level))))
-  (insert "\n")
-  (previous-line)
-  (unless (string= issue-id (org-entry-get (point) "YT_SHORTCODE" t))
-    (org-set-property "YT_SHORTCODE" issue-id))
-  (next-line)
+  (let ((curpoint (point)))
+    (insert (format "%s %s %s by %s\n\n"
+                    (make-string level ?*)
+                    (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
+                    (kpz/yt-capitalize-first-char (format "%s" type))
+                    author
+                    ))
+    (previous-line)
+    (org-set-property "YT_CONTENT_HASH" (if content (sha1 content) ""))
+    (org-set-property "YT_ID" node-id)
+    (org-set-property "YT_TYPE" (format "%s" type))
+    (insert "\n")
+    (when content (insert (kpz/yt-md-to-org content (+ 1 level))))
+    (unless (string= issue-id (org-entry-get (point) "YT_SHORTCODE" t))
+      (org-set-property "YT_SHORTCODE" issue-id))
+    (goto-char curpoint)
+
+    )
   )
 
 (defun kpz/yt-find-node ()
@@ -297,7 +300,7 @@
                         (org-gfm-export-as-markdown nil t)
                         (markdown-mode)
                         (replace-regexp "^#" "##" nil (point-min) (point-max))
-                        (when (y-or-n-p (format "Send this content as new comment to ticket %s?" issue-id))
+                        (when (y-or-n-p (format "Create new comment for ticket %s from this content?" issue-id))
                           (alist-get 'id (kpz/yt-send-new-comment-alist issue-id `((text . ,(buffer-string)))))
                           )
                         )))
@@ -337,7 +340,7 @@
             (org-gfm-export-as-markdown nil t)
             (markdown-mode)
             (replace-regexp "^#" "##" nil (point-min) (point-max))
-            (when (y-or-n-p (format "Send this content as %s with id %s to ticket %s?" type node-id issue-id))
+            (when (y-or-n-p (format "Update %s with id %s of ticket %s with this content?" type node-id issue-id))
               (if (eq type 'description)
                   (kpz/yt-send-issue-alist issue-id `((description . ,(buffer-string))))
                 (kpz/yt-send-issue-comment-alist issue-id node-id `((text . ,(buffer-string)))))
