@@ -84,12 +84,21 @@
   "Return the shortcode defined by an org property YT_SHORTCODE or nil"
   (org-entry-get (point) "YT_SHORTCODE" t))
 
+(defun kpz/yt-shortcode-from-branch ()
+  "Return the shortcode from the name of the current git branch"
+  (let ((branch-name (shell-command-to-string "git rev-parse --abbrev-ref HEAD")))
+    (if (string-match "^\\([A-z]+/\\)?\\([A-z]+-[0-9]+\\)-.*$" branch-name)
+        (match-string 2 branch-name)))
+  )
+
 (defun kpz/yt-guess-shortcode ()
   "Return a shortcode from current context."
   (let ((issue (kpz/yt-shortcode-from-point)))
     (if issue issue
       (let ((issue (kpz/yt-shortcode-from-org-property)))
-        (if issue issue nil)))))
+        (if issue issue
+          (let ((issue (kpz/yt-shortcode-from-branch)))
+            (if issue issue nil)))))))
 
 (defun kpz/yt-guess-or-query-shortcode ()
   "Guess shortcode on context or start a query."
