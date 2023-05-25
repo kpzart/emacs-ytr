@@ -404,7 +404,7 @@
 (defun kpz/yt-org (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
   (kpz/yt-issue-alist-to-org (kpz/yt-retrieve-issue-alist shortcode) shortcode)
-  (org-fold-show-all)
+  (org-mode)
   (kpz/yt-shortcode-buttonize-buffer)
   (goto-char (point-min))
   )
