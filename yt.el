@@ -159,6 +159,8 @@
     (shell-command-on-region (point-min) (point-max)
                              (format "pandoc -f gfm -t org")
                              nil t "*yt-convert-error*")
+    (replace-string "☒" "[X]" t (point-min) (point-max))
+    (replace-string "☐" "[ ]" t (point-min) (point-max))
     (org-mode)
     (kpz/yt-demote-org-headings (or level 3))
     (org-unindent-buffer)
