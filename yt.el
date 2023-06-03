@@ -50,6 +50,8 @@
 
 (defcustom yt-plz-debug nil "Print plz debug messages if non nil" :type 'bool :group 'yt)
 
+(defcustom yt-make-new-comment-behavior 'link "What should be done with the region from which a comment was created? One of 'kill, 'fetch (buggy), 'link or nil." :type 'symbol :group 'yt)
+
 ;; * urls and shortcodes
 (defun kpz/yt-issue-url (shortcode)
   "Return the URL for a issue given by shortcode"
@@ -290,10 +292,13 @@
 (defun kpz/yt-new-comment ()
   "Send the current subtree as comment to a ticket"
   (interactive)
-  (unless (region-active-p) (org-mark-subtree))
-  (let* ((issue-id (kpz/yt-guess-or-query-shortcode))
+  (cond ((region-active-p) (narrow-to-region (mark) (point)))
+        (t (org-narrow-to-subtree)))
+  (goto-char (point-min))
+  (let* ((curlevel (kpz/yt-max-heading-level))
+         (issue-id (kpz/yt-guess-or-query-shortcode))
          (new-node-id (save-window-excursion
-                        (org-gfm-export-as-markdown nil t)
+                        (org-gfm-export-as-markdown nil nil)
                         (markdown-mode)
                         (replace-regexp "^#" "##" nil (point-min) (point-max))
                         (when (y-or-n-p (format "Create new comment for ticket %s from this content?" issue-id))
@@ -301,16 +306,19 @@
                           )
                         )))
     (cond (new-node-id
-           (kill-region (mark) (point))
-           (insert (format "%s Comment\n\n" (make-string (+ (org-current-level) 1) ?*)))
-           (org-set-property "YT_ID" new-node-id)
-           (org-set-property "YT_TYPE" "comment")
-           (unless (org-entry-get (point) "YT_SHORTCODE" t) (org-set-property "YT_SHORTCODE" issue-id))
-           (kpz/yt-fetch-remote-node)
            (message "New comment created on %s with node id %s." issue-id new-node-id)
-           ))
-    )
-  )
+           (cond ((eq yt-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
+                 ((eq yt-make-new-comment-behavior 'link)
+                  (kill-region (point-min) (point-max))
+                  (insert (format "%s#%s" issue-id new-node-id)))
+                 ((eq yt-make-new-comment-behavior 'fetch)
+                  (kill-region (point-min) (point-max))
+                  (kpz/yt-get-insert-remote-node issue-id new-node-id 'comment curlevel)
+                  ;; (goto-char (point-min))
+                  ;; (unless (org-entry-get (point) "YT_SHORTCODE" t)
+                  ;;   (org-set-property "YT_SHORTCODE" issue-id))
+                  )))))
+  (widen))
 
 (defun kpz/yt-update-remote-node ()
   "Update a node on remote side after editing locally"
