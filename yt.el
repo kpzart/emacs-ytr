@@ -228,31 +228,21 @@
   )
 
 (defun kpz/yt-demote-org-headings (level)
-  (setq base-level (kpz/yt-max-heading-level))
-  (when base-level
-    (if (< level base-level)
-        (progn
-          (setq dir -1)
-          (goto-char (point-max)))
-      (progn
-        (setq dir 1)
-        (goto-char (point-min))))
-
-    (setq last-point 0)
-    (when (not (org-at-heading-p))
-      (org-next-visible-heading dir))
-    (while (and (/= (point) last-point) (org-at-heading-p))
-      (when (= (org-current-level) base-level)
-        (let ((levelsteps (- level (org-current-level))))
-          (if (> levelsteps 0)
-              (dotimes (i levelsteps)
-                (org-demote-subtree))
-            (dotimes (i (- 0 levelsteps))
-              (org-promote-subtree))
-            )))
-      (setq last-point (point))
-      (org-next-visible-heading dir)))
+  "Demote all headings in the current buffer so the new max level it LEVEL."
+  (let ((base-level (kpz/yt-max-heading-level)))
+    (when base-level
+      (kpz/yt-demote-org-headings-by (- level base-level))))
   )
+
+(defun kpz/yt-demote-org-headings-by (level)
+  "Demote all headings in the current buffer by the specified LEVEL."
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward "^\\(\\*+\\) " nil t)
+      (let* ((heading-level (length (match-string 1)))
+             (new-level (min (+ heading-level level) 6))
+             (new-heading (concat (make-string new-level ?*) " ")))
+        (replace-match new-heading)))))
 
 (defun kpz/yt-capitalize-first-char (&optional string)
   "Capitalize only the first character of the input STRING."
