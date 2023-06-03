@@ -210,20 +210,13 @@
   )
 
 (defun kpz/yt-max-heading-level ()
-  (org-fold-show-all)
-  (goto-char (point-min))
-  (when (not (org-at-heading-p))
-    (org-next-visible-heading 1)
-    )
-  (let ((base-level nil)
-        (last-point 0))
-    (while (and (org-at-heading-p) (/= (point) last-point))
-      (setq base-level (if (and base-level (< base-level (org-current-level))) base-level (org-current-level)))
-      (org-next-visible-heading 1)
-      )
-    base-level
-    )
-  )
+  "Determine the highest Heading in the buffer. Return nil if no heading found."
+  (save-excursion
+    (goto-char (point-min))
+    (let ((lowest-level 6)) ;; Set initial lowest level to the maximum heading level (e.g., 6 for `org-mode`)
+      (while (re-search-forward "^\\(\\*+\\)" nil t)
+        (setq lowest-level (min lowest-level (length (match-string 1)))))
+      lowest-level)))
 
 (defun kpz/yt-first-heading-level ()
   (org-fold-show-all)
