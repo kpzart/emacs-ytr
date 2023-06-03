@@ -361,6 +361,27 @@
     (kpz/yt-new-comment))
   )
 
+(defun kpz/yt-get-insert-remote-node (issue-id node-id type level)
+  "Insert a remote node in org format"
+  (let* (
+        (node-alist
+         (if (eq type 'description)
+             (kpz/yt-retrieve-issue-alist issue-id)
+           (kpz/yt-retrieve-issue-comment-alist issue-id node-id))
+         )
+        (created (alist-get 'created node-alist))
+        (author (alist-get 'login
+                           (if (eq type 'description)
+                               (alist-get 'reporter node-alist)
+                             (alist-get 'author node-alist))))
+        (content
+         (if (eq type 'description)
+             (alist-get 'description node-alist)
+           (alist-get 'text node-alist)))
+        )
+    (kpz/yt-org-insert-node content level type issue-id node-id author created))
+  )
+
 (defun kpz/yt-fetch-remote-node ()
   "Update a local node withs its remote content"
   (interactive)
@@ -372,25 +393,11 @@
                    (user-error "Cannot fetch node of type %s" type-str))))
          (issue-id (org-entry-get (point) "YT_SHORTCODE" t))
          (node-id (org-entry-get (point) "YT_ID" t))
-         (node-alist
-          (if (eq type 'description)
-              (kpz/yt-retrieve-issue-alist issue-id)
-            (kpz/yt-retrieve-issue-comment-alist issue-id node-id))
-          )
-         (created (alist-get 'created node-alist))
-         (author (alist-get 'login
-                            (if (eq type 'description)
-                                (alist-get 'reporter node-alist)
-                              (alist-get 'author node-alist))))
-         (content
-           (if (eq type 'description)
-               (alist-get 'description node-alist)
-             (alist-get 'text node-alist)))
          (curlevel (org-current-level))
          )
     ;; markiere den subtree und ersetze ihn durch das geholte, setze die properties
     (org-cut-subtree)
-    (kpz/yt-org-insert-node content curlevel type issue-id node-id author created)
+    (kpz/yt-get-insert-remote-node issue-id node-id type curlevel)
     )
   )
 
