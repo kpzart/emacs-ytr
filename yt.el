@@ -161,6 +161,8 @@
                              nil t "*yt-convert-error*")
     (replace-string "☒" "[X]" t (point-min) (point-max))
     (replace-string "☐" "[ ]" t (point-min) (point-max))
+    (goto-char (point-min))
+    (flush-lines " *:[A-Z_]+:.*$")
     (org-mode)
     (kpz/yt-demote-org-headings (or level 3))
     (org-unindent-buffer)
