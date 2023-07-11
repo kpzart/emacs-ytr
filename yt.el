@@ -52,6 +52,8 @@
 
 (defcustom yt-make-new-comment-behavior 'link "What should be done with the region from which a comment was created? One of 'kill, 'fetch (buggy), 'link or nil." :type 'symbol :group 'yt)
 
+(defvar yt-issue-history '() "History for issues")
+
 ;; * urls and shortcodes
 (defun kpz/yt-issue-url (shortcode)
   "Return the URL for a issue given by shortcode"
@@ -107,6 +109,18 @@
   (let ((guess (kpz/yt-guess-shortcode)))
     (if guess guess (kpz/yt-query-shortcode)))
   )
+
+;; history
+(defun kpz/yt-retrieve-history-issues-alist ()
+  (let ((result))
+    (dolist (elt (reverse yt-issue-history) result)
+      (setq result (cons (kpz/yt-retrieve-issue-alist elt) result))))
+  )
+
+(defun kpz/yt-add-issue-to-history (shortcode)
+  (delete shortcode yt-issue-history)
+  (push shortcode yt-issue-history)
+)
 
 ;; * api
 (defun kpz/yt-plz (method request &optional body)
@@ -305,6 +319,7 @@
                           (alist-get 'id (kpz/yt-send-new-comment-alist issue-id `((text . ,(buffer-string)))))
                           )
                         )))
+    (kpz/yt-add-issue-to-history issue-id)
     (cond (new-node-id
            (message "New comment created on %s with node id %s." issue-id new-node-id)
            (cond ((eq yt-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
@@ -337,6 +352,7 @@
          (remote-hash (if content (sha1 content) ""))
          (local-hash (org-entry-get (point) "YT_CONTENT_HASH" t))
          )
+    (kpz/yt-add-issue-to-history issue-id)
     (when (not (string= local-hash remote-hash))
         (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
 
@@ -412,13 +428,17 @@
 (defun kpz/yt-query-org ()
   "Retrieve an issue and convert it to a temporary org buffer"
   (interactive)
-  (kpz/yt-org (kpz/yt-query-shortcode))
+  (let ((shortcode (kpz/yt-guess-or-query-shortcode)))
+    (kpz/yt-add-issue-to-history shortcode)
+    (kpz/yt-org shortcode))
   )
 
 (defun kpz/yt-smart-query-org ()
   "Retrieve an issue and convert it to a temporary org buffer"
   (interactive)
-  (kpz/yt-org (kpz/yt-guess-or-query-shortcode))
+  (let ((shortcode (kpz/yt-guess-or-query-shortcode)))
+    (kpz/yt-add-issue-to-history shortcode)
+    (kpz/yt-org shortcode))
   )
 
 ;; * preview
@@ -466,21 +486,23 @@
 (defun kpz/yt-query-browse ()
   "Open an issue in the webbrowser"
   (interactive)
-  (let* ((choice-id (kpz/yt-query-shortcode)))
-    (browse-url (kpz/yt-issue-url choice-id))
+  (let* ((shortcode (kpz/yt-query-shortcode)))
+    (kpz/yt-add-issue-to-history shortcode)
+    (browse-url (kpz/yt-issue-url shortcode))
     )
   )
 
 (defun kpz/yt-smart-query-browse ()
   "Open an issue in the webbrowser"
   (interactive)
-  (let* ((choice-id (kpz/yt-guess-or-query-shortcode)))
-    (browse-url (kpz/yt-issue-url choice-id))
+  (let* ((shortcode (kpz/yt-guess-or-query-shortcode)))
+    (kpz/yt-add-issue-to-history shortcode)
+    (browse-url (kpz/yt-issue-url shortcode))
     )
   )
 
 (defun kpz/yt-query-refine-browse ()
-  "Present a list of resolved issues in the minibuffer"
+  "Edit a predefined query to find an issue and open it in the browser"
   (interactive)
   (let* ((query-orig (completing-read "Query: " yt-queries nil t))
          (query (read-string "Refine query: " query-orig nil))
@@ -496,7 +518,7 @@
 
 ;; * helm
 (defun kpz/yt-helm-query (&optional defaultquery)
-  "Return a shortcode using helm"
+  "Use Helm to select an issue from a query and open it."
   (interactive)
   (let* ((query (completing-read "Query: " yt-queries nil nil defaultquery))
          (result (kpz/yt-retrieve-query-issues-alist query))
@@ -509,8 +531,14 @@
     (if choices
         (helm :sources (helm-build-sync-source "yt-issues"
                          :candidates choices
-                         :action '(("Open in browser" . (lambda (issue-alist) (browse-url (kpz/yt-issue-url (alist-get 'idReadable issue-alist)))))
-                                   ("Open in org buffer" . (lambda (issue-alist) (kpz/yt-org (alist-get 'idReadable issue-alist)))))
+                         :action '(("Open in browser" . (lambda (issue-alist)
+                                                          (let ((shortcode (alist-get 'idReadable issue-alist)))
+                                                            (kpz/yt-add-issue-to-history shortcode)
+                                                            (browse-url (kpz/yt-issue-url shortcode)))))
+                                   ("Open in org buffer" . (lambda (issue-alist)
+                                                             (let ((shortcode (alist-get 'idReadable issue-alist)))
+                                                               (kpz/yt-add-issue-to-history shortcode)
+                                                               (kpz/yt-org shortcode)))))
                          :must-match 'ignore
                          :persistent-action 'kpz/yt-sneak-window
                          :keymap (let ((map (make-sparse-keymap)))
@@ -525,6 +553,30 @@
       (message "No Issues found."))
     )
   )
+
+(defun kpz/yt-helm-history ()
+  "Use Helm to select an issue from issue history and open it."
+  (interactive)
+  (let* ((result (kpz/yt-retrieve-history-issues-alist))
+         (choices (mapcar (lambda (issue-alist)
+                            (let-alist issue-alist
+                              (cons (format "%s: %s" .idReadable .summary) issue-alist))
+                              )
+                          result))
+         )
+    (if choices
+        (helm :sources (helm-build-sync-source "yt-issues"
+                         :candidates choices
+                         :action '(("Open in browser" . (lambda (issue-alist) (browse-url (kpz/yt-issue-url (alist-get 'idReadable issue-alist)))))
+                                   ("Open in org buffer" . (lambda (issue-alist) (kpz/yt-org (alist-get 'idReadable issue-alist)))))
+                         :must-match 'ignore
+                         :persistent-action 'kpz/yt-sneak-window
+                         :cleanup (lambda () (kill-matching-buffers "*yt-describe-issue*" nil t))
+                         )
+              :buffer "*helm yt*")
+      (message "No Issues found."))
+    )
+)
 
 (provide 'yt)
 ;;; yt.el ends here
