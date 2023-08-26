@@ -170,7 +170,7 @@
   "Convert a markdown string to org mode using pandoc. LEVEL indicates the level of top level headings in org and defaults to 3."
   (save-current-buffer
     (set-buffer (get-buffer-create "*yt-convert*"))
-    (setf (buffer-string) "")
+    (erase-buffer)
     (insert input)
     (shell-command-on-region (point-min) (point-max)
                              (format "pandoc -f gfm -t org")
@@ -190,7 +190,7 @@
   "Convert an alist of markdown code into an org buffer with proper headings"
   (let ((bufname (format "*kpz/yt-org-%s*" (downcase shortcode))))
     (set-buffer (get-buffer-create bufname))
-    (setf (buffer-string) "")
+    (erase-buffer)
     (org-mode)
     (let-alist input
       ;; title and description
