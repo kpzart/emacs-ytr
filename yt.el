@@ -38,7 +38,6 @@
 
 (require 'ffap)
 (require 'plz)
-(require 'helm)
 
 (defgroup yt nil "Youtrack integration into emacs")
 
@@ -517,66 +516,67 @@
   )
 
 ;; * helm
-(defun kpz/yt-helm-query (&optional defaultquery)
-  "Use Helm to select an issue from a query and open it."
-  (interactive)
-  (let* ((query (completing-read "Query: " yt-queries nil nil defaultquery))
-         (result (kpz/yt-retrieve-query-issues-alist query))
-         (choices (mapcar (lambda (issue-alist)
-                            (let-alist issue-alist
-                              (cons (format "%s: %s" .idReadable .summary) issue-alist))
+(if (require 'helm nil t)
+    (progn
+      (defun kpz/yt-helm-query (&optional defaultquery)
+        "Use Helm to select an issue from a query and open it."
+        (interactive)
+        (let* ((query (completing-read "Query: " yt-queries nil nil defaultquery))
+               (result (kpz/yt-retrieve-query-issues-alist query))
+               (choices (mapcar (lambda (issue-alist)
+                                  (let-alist issue-alist
+                                    (cons (format "%s: %s" .idReadable .summary) issue-alist))
+                                  )
+                                result))
+               )
+          (if choices
+              (helm :sources (helm-build-sync-source
+                              "yt-issues"
+                              :candidates choices
+                              :action '(("Open in browser" . (lambda (issue-alist)
+                                                               (let ((shortcode (alist-get 'idReadable issue-alist)))
+                                                                 (kpz/yt-add-issue-to-history shortcode)
+                                                                 (browse-url (kpz/yt-issue-url shortcode)))))
+                                        ("Open in org buffer" . (lambda (issue-alist)
+                                                                  (let ((shortcode (alist-get 'idReadable issue-alist)))
+                                                                    (kpz/yt-add-issue-to-history shortcode)
+                                                                    (kpz/yt-org shortcode)))))
+                              :must-match 'ignore
+                              :persistent-action 'kpz/yt-sneak-window
+                              :keymap (let ((map (make-sparse-keymap)))
+                                        (set-keymap-parent map helm-map)
+                                        (define-key map (kbd "M-q") (lambda () (interactive) (helm-run-after-exit 'kpz/yt-helm-query query)))
+                                        (define-key map (kbd "M-Q") (lambda () (interactive) (helm-run-after-exit 'kpz/yt-helm-query)))
+                                        (define-key map (kbd "M-w") (lambda () (interactive) (helm-run-after-exit 'browse-url (kpz/yt-query-url query))))
+                                        map)
+                              :cleanup (lambda () (kill-matching-buffers "*yt-describe-issue*" nil t))
                               )
-                          result))
-         )
-    (if choices
-        (helm :sources (helm-build-sync-source "yt-issues"
-                         :candidates choices
-                         :action '(("Open in browser" . (lambda (issue-alist)
-                                                          (let ((shortcode (alist-get 'idReadable issue-alist)))
-                                                            (kpz/yt-add-issue-to-history shortcode)
-                                                            (browse-url (kpz/yt-issue-url shortcode)))))
-                                   ("Open in org buffer" . (lambda (issue-alist)
-                                                             (let ((shortcode (alist-get 'idReadable issue-alist)))
-                                                               (kpz/yt-add-issue-to-history shortcode)
-                                                               (kpz/yt-org shortcode)))))
-                         :must-match 'ignore
-                         :persistent-action 'kpz/yt-sneak-window
-                         :keymap (let ((map (make-sparse-keymap)))
-                                   (set-keymap-parent map helm-map)
-                                   (define-key map (kbd "M-q") (lambda () (interactive) (helm-run-after-exit 'kpz/yt-helm-query query)))
-                                   (define-key map (kbd "M-Q") (lambda () (interactive) (helm-run-after-exit 'kpz/yt-helm-query)))
-                                   (define-key map (kbd "M-w") (lambda () (interactive) (helm-run-after-exit 'browse-url (kpz/yt-query-url query))))
-                                   map)
-                         :cleanup (lambda () (kill-matching-buffers "*yt-describe-issue*" nil t))
-                         )
-              :buffer "*helm yt*")
-      (message "No Issues found."))
-    )
-  )
+                    :buffer "*helm yt*")
+            (message "No Issues found."))))
 
-(defun kpz/yt-helm-history ()
-  "Use Helm to select an issue from issue history and open it."
-  (interactive)
-  (let* ((result (kpz/yt-retrieve-history-issues-alist))
-         (choices (mapcar (lambda (issue-alist)
-                            (let-alist issue-alist
-                              (cons (format "%s: %s" .idReadable .summary) issue-alist))
-                              )
-                          result))
-         )
-    (if choices
-        (helm :sources (helm-build-sync-source "yt-issues"
-                         :candidates choices
-                         :action '(("Open in browser" . (lambda (issue-alist) (browse-url (kpz/yt-issue-url (alist-get 'idReadable issue-alist)))))
-                                   ("Open in org buffer" . (lambda (issue-alist) (kpz/yt-org (alist-get 'idReadable issue-alist)))))
-                         :must-match 'ignore
-                         :persistent-action 'kpz/yt-sneak-window
-                         :cleanup (lambda () (kill-matching-buffers "*yt-describe-issue*" nil t))
-                         )
-              :buffer "*helm yt*")
-      (message "No Issues found."))
-    )
-)
+      (defun kpz/yt-helm-history ()
+        "Use Helm to select an issue from issue history and open it."
+        (interactive)
+        (let* ((result (kpz/yt-retrieve-history-issues-alist))
+               (choices (mapcar (lambda (issue-alist)
+                                  (let-alist issue-alist
+                                    (cons (format "%s: %s" .idReadable .summary) issue-alist))
+                                  )
+                                result))
+               )
+          (if choices
+              (helm :sources (helm-build-sync-source "yt-issues"
+                                                     :candidates choices
+                                                     :action '(("Open in browser" . (lambda (issue-alist) (browse-url (kpz/yt-issue-url (alist-get 'idReadable issue-alist)))))
+                                                               ("Open in org buffer" . (lambda (issue-alist) (kpz/yt-org (alist-get 'idReadable issue-alist)))))
+                                                     :must-match 'ignore
+                                                     :persistent-action 'kpz/yt-sneak-window
+                                                     :cleanup (lambda () (kill-matching-buffers "*yt-describe-issue*" nil t))
+                                                     )
+                    :buffer "*helm yt*")
+            (message "No Issues found."))
+          ))
+  ))
 
 (provide 'yt)
 ;;; yt.el ends here
