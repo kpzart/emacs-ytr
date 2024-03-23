@@ -146,7 +146,7 @@
 
 (defun kpz/yt-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (kpz/yt-plz 'get (concat yt-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login)),created,resolved,reporter(login),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary))")))
+  (kpz/yt-plz 'get (concat yt-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login)),created,resolved,reporter(login),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name))")))
 
 (defun kpz/yt-retrieve-issue-comment-alist (issue-id comment-id)
   "Retrieve information concering the given issue and return an alist."
@@ -163,6 +163,11 @@
 (defun kpz/yt-send-issue-alist (issue alist)
   "Send the information in ALIST for a remote update of issue with id ISSUE"
   (kpz/yt-plz 'post (concat yt-baseurl "/api/issues/" issue "?fields=description") (json-encode alist)))
+
+(defun kpz/yt-get-customField-value (issue-alist field-name)
+  (let-alist issue-alist
+    (cdr (assoc 'name (assoc 'value
+                             (cl-find-if (lambda (alist) (equal (cdr (assoc 'name alist)) field-name)) .customFields))))))
 
 ;; * org mode conversion
 (defun kpz/yt-md-to-org (input level)
@@ -445,10 +450,12 @@
 (defun kpz/yt-sneak (issue-alist)
   (let-alist issue-alist
     (princ (format "%s: %s\n" .idReadable .summary))
-    (princ (format "Reporter: %s, Created: %s, Resolved: %s\n"
+    (princ (format "Reporter: %s, Created: %s, Resolved: %s, State: %s, Assignee: %s\n"
                    (alist-get 'login .reporter)
                    (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000))
-                   (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-")))
+                   (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-")
+                   (kpz/yt-get-customField-value issue-alist "State")
+                   (kpz/yt-get-customField-value issue-alist "Assignee")))
     (princ "------------------------\n")
     (princ .description)))
 
