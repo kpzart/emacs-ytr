@@ -307,6 +307,103 @@
   )
 
 ;; * org interactive
+(defvar-keymap yt-commit-new-node-mode-map "C-c C-c" #'kpz/yt-commit-new-node)
+(defvar-keymap yt-commit-new-node-mode-map "C-c C-k" #'kpz/yt-cancel-commit)
+
+(define-derived-mode yt-commit-new-node-mode markdown-mode "yt-commit-new-node-mode" "Mode for editing markdown exports from org before sending them to youtrack")
+
+(defvar-keymap yt-commit-update-node-mode-map "C-c C-c" #'kpz/yt-commit-update-node)
+(defvar-keymap yt-commit-update-node-mode-map "C-c C-k" #'kpz/yt-cancel-commit)
+
+(define-derived-mode yt-commit-update-node-mode markdown-mode "yt-commit-update-node-mode" "Mode for editing markdown exports from org before sending them to youtrack")
+
+(defun kpz/yt-cancel-commit ()
+  "Cancel committing something to youtrack"
+  (interactive)
+  (set-window-configuration yt-buffer-wconf)
+  (widen)
+  )
+
+(defun kpz/yt-commit-new-node ()
+  "Commit the buffer to youtrack to create a new node"
+  (interactive)
+  (setq new-node-id (alist-get 'id (kpz/yt-send-new-comment-alist yt-buffer-issue-id `((text . ,(buffer-string))))))
+  (kpz/yt-add-issue-to-history yt-buffer-issue-id)
+  (let ((curlevel yt-buffer-curlevel)
+        (issue-id yt-buffer-issue-id))
+    (set-window-configuration yt-buffer-wconf)
+    (cond (new-node-id
+           (message "New comment created on %s with node id %s." issue-id new-node-id)
+           (cond ((eq yt-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
+                 ((eq yt-make-new-comment-behavior 'link)
+                  (kill-region (point-min) (point-max))
+                  (insert (format "%s#%s" issue-id new-node-id)))
+                 ((eq yt-make-new-comment-behavior 'fetch)
+                  (kill-region (point-min) (point-max))
+                  (kpz/yt-get-insert-remote-node issue-id new-node-id 'comment curlevel)
+                  ))))
+    (widen)))
+
+(defun kpz/yt-commit-update-node ()
+  "Commit the buffer to youtrack to update a node"
+  (interactive)
+  (if (eq yt-buffer-commit-type 'description)
+      (kpz/yt-send-issue-alist yt-buffer-issue-id `((description . ,(buffer-string))))
+    (kpz/yt-send-issue-comment-alist yt-buffer-issue-id yt-buffer-node-id `((text . ,(buffer-string)))))
+  (message "Node successfully updated")
+  (set-window-configuration yt-buffer-wconf)
+  (kpz/yt-fetch-remote-node))
+
+
+(defun kpz/yt-new-comment-editable ()
+  "Send the current subtree as comment to a ticket"
+  (interactive)
+  (cond ((region-active-p) (narrow-to-region (mark) (point)))
+        (t (org-narrow-to-subtree)))
+  (goto-char (point-min))
+
+  (let ((wconf (current-window-configuration))
+        (issue-id (kpz/yt-guess-or-query-shortcode))
+        (curlevel (kpz/yt-max-heading-level)))
+    (org-gfm-export-as-markdown nil nil)
+    (markdown-mode)
+    (replace-regexp "^#" "##" nil (point-min) (point-max))
+    (yt-commit-new-node-mode)
+    (setq-local yt-buffer-wconf wconf
+                yt-buffer-curlevel curlevel
+                yt-buffer-issue-id issue-id)))
+
+(defun kpz/yt-update-remote-node-editable ()
+  "Update a node on remote side after editing locally"
+  (interactive)
+  (let* ((type-str (kpz/yt-find-node))
+         (type (if (string= type-str "description")
+                   'description
+                 (if (string= type-str "comment")
+                     'comment
+                   (user-error (format "Unknown node type: %s" type-str)))))
+         (issue-id (org-entry-get (point) "YT_SHORTCODE" t))
+         (node-id (org-entry-get (point) "YT_ID" t))
+         (content (if (eq type 'description)
+                      (alist-get 'description (kpz/yt-retrieve-issue-alist issue-id))
+                    (alist-get 'text (kpz/yt-retrieve-issue-comment-alist issue-id node-id))))
+         (remote-hash (if content (sha1 content) ""))
+         (local-hash (org-entry-get (point) "YT_CONTENT_HASH" t))
+         (wconf (current-window-configuration))
+         )
+    (kpz/yt-add-issue-to-history issue-id)
+    (when (not (string= local-hash remote-hash))
+        (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
+
+    (org-gfm-export-as-markdown nil t)
+    (replace-regexp "^#" "##" nil (point-min) (point-max))
+    (yt-commit-update-node-mode)
+    (setq-local yt-buffer-wconf wconf
+                yt-buffer-commit-type type
+                yt-buffer-issue-id issue-id
+                yt-buffer-node-id node-id))
+  )
+
 (defun kpz/yt-new-comment ()
   "Send the current subtree as comment to a ticket"
   (interactive)
@@ -377,8 +474,8 @@
   "Create a new comment or update the node, depending on context."
   (interactive)
   (if (org-entry-get (point) "YT_TYPE" t)
-      (kpz/yt-update-remote-node)
-    (kpz/yt-new-comment))
+      (kpz/yt-update-remote-node-editable)
+    (kpz/yt-new-comment-editable))
   )
 
 (defun kpz/yt-get-insert-remote-node (issue-id node-id type level)
