@@ -62,6 +62,22 @@
   "Return the URL for a query"
   (concat yt-baseurl "/issues?q=" (url-hexify-string query)))
 
+(defun kpz/yt-completing-read-annotated (prompt choices-annotated)
+  "Like competing-read but receives a sequence of (choice . annotations) cons cells."
+  ;; (completing-read prompt choices-annotated)
+  (completing-read prompt (lambda (str pred flag)
+                            (pcase flag
+                              ('metadata `(metadata (annotation-function . ,(lambda (choice)
+                                                                              (marginalia--fields
+                                                                               ((cdr (assoc choice choices-annotated))))
+                                                                              ))))
+                              (_
+                               (all-completions str choices-annotated pred))))))
+
+;; Test Code
+;; (kpz/yt-completing-read-annotated "Test: " '(("A" . "Attr A1") ("BB" . "Attr B1"))) ;; works
+;; (kpz/yt-completing-read-annotated "Test: " '(("A" . ("Attr A1" "Attr A2")) ("B" . ("Attr B1" "Attr B2")))) ;; doesnt work yet
+
 (defun kpz/yt-query-shortcode ()
   "Return a shortcode from a query"
   (let* ((query (completing-read "Query: " yt-queries nil nil))
@@ -72,6 +88,18 @@
          (choice (completing-read "Issue: " choices)))
     (car (split-string choice ":")))
   )
+
+(defun kpz/yt-query-shortcode-annoted ()
+  "Return a shortcode from a query"
+  (let* ((query (completing-read "Query: " yt-queries nil nil))
+         (result (kpz/yt-retrieve-query-issues-alist query))
+         (choices-annotated (mapcar (lambda (item)
+                                      (cons
+                                       (concat (alist-get 'idReadable item) ": " (alist-get 'summary item))
+                                       (concat "Shortcode: " (alist-get 'idReadable item)))) ; this is a dummy
+                                    result))
+         (choice (kpz/yt-completing-read-annotated "Issue: " choices-annotated)))
+    (car (split-string choice ":"))))
 
 (add-to-list 'ffap-string-at-point-mode-alist '(yt "0-9A-z-" "" ""))
 
