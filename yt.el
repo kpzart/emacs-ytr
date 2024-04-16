@@ -134,7 +134,7 @@
 (defun kpz/yt-guess-or-query-shortcode ()
   "Guess shortcode on context or start a query."
   (let ((guess (kpz/yt-guess-shortcode)))
-    (if guess guess (kpz/yt-query-shortcode)))
+    (if guess guess (kpz/yt-query-shortcode-annoted)))
   )
 
 ;; history
@@ -557,7 +557,7 @@
 (defun kpz/yt-query-org ()
   "Retrieve an issue and convert it to a temporary org buffer"
   (interactive)
-  (let ((shortcode (kpz/yt-guess-or-query-shortcode)))
+  (let ((shortcode (kpz/yt-query-shortcode)))
     (kpz/yt-add-issue-to-history shortcode)
     (kpz/yt-org shortcode))
   )
@@ -617,7 +617,7 @@
 (defun kpz/yt-query-browse ()
   "Open an issue in the webbrowser"
   (interactive)
-  (let* ((shortcode (kpz/yt-query-shortcode)))
+  (let* ((shortcode (kpz/yt-query-shortcode-annoted)))
     (kpz/yt-add-issue-to-history shortcode)
     (browse-url (kpz/yt-issue-url shortcode))
     )
