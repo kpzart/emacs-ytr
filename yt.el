@@ -68,8 +68,8 @@
   (completing-read prompt (lambda (str pred flag)
                             (pcase flag
                               ('metadata `(metadata (annotation-function . ,(lambda (choice)
-                                                                              (marginalia--fields
-                                                                               ((cdr (assoc choice choices-annotated))))
+                                                                              (let ((annotation (cdr (assoc choice choices-annotated))))
+                                                                                (marginalia--fields (annotation)))
                                                                               ))))
                               (_
                                (all-completions str choices-annotated pred))))))
