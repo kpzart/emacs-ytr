@@ -134,7 +134,7 @@
 (defun kpz/yt-guess-or-query-shortcode ()
   "Guess shortcode on context or start a query."
   (let ((guess (kpz/yt-guess-shortcode)))
-    (if guess guess (kpz/yt-query-shortcode-annoted)))
+    (if guess guess (kpz/yt-query-shortcode)))
   )
 
 ;; history
@@ -617,7 +617,7 @@
 (defun kpz/yt-query-browse ()
   "Open an issue in the webbrowser"
   (interactive)
-  (let* ((shortcode (kpz/yt-query-shortcode-annoted)))
+  (let* ((shortcode (kpz/yt-query-shortcode)))
     (kpz/yt-add-issue-to-history shortcode)
     (browse-url (kpz/yt-issue-url shortcode))
     )
