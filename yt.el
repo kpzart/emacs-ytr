@@ -58,6 +58,10 @@
   "Return the URL for a issue given by shortcode"
   (concat yt-baseurl "/issue/" shortcode))
 
+(defun kpz/yt-issue-comment-url (shortcode comment-id)
+  "Return the URL for a issue given by shortcode with focus on comment with comment-id"
+  (concat yt-baseurl "/issue/" shortcode "#focus=Comments-" comment-id ".0-0"))
+
 (defun kpz/yt-query-url (query)
   "Return the URL for a query"
   (concat yt-baseurl "/issues?q=" (url-hexify-string query)))
@@ -101,15 +105,21 @@
          (choice (kpz/yt-completing-read-annotated "Issue: " choices-annotated)))
     (car (split-string choice ":"))))
 
-(add-to-list 'ffap-string-at-point-mode-alist '(yt "0-9A-z-" "" ""))
+(add-to-list 'ffap-string-at-point-mode-alist '(yt "0-9A-z-#" "" ""))
+
+(defun kpz/yt-parse-shortcode-and-comment-id (candidate)
+  "Parse string for and issue shortcode and a comment id if present"
+  (if (string-match "^\\([A-z]+-[0-9]+\\)\\(#\\([0-9-]+\\)\\)?$" candidate)
+      (cons (match-string 1 candidate) (match-string 3 candidate))
+    nil))
+
+(defun kpz/yt-shortcode-and-comment-id-from-point ()
+  "Return a cons with the shortcode and optioinal the item id at point or nil if there is none"
+  (kpz/yt-parse-shortcode-and-comment-id (ffap-string-at-point 'yt)))
 
 (defun kpz/yt-shortcode-from-point ()
   "Return the shortcode at point or nil if there is none"
-  (let ((candidate (ffap-string-at-point 'yt)))
-    (if (string-match-p "[A-z]+-[0-9]+" candidate)
-        candidate
-      nil))
-  )
+  (car (kpz/yt-shortcode-and-comment-id-from-point)))
 
 (defun kpz/yt-shortcode-from-org-property ()
   "Return the shortcode defined by an org property YT_SHORTCODE or nil"
@@ -118,7 +128,7 @@
 (defun kpz/yt-shortcode-from-branch ()
   "Return the shortcode from the name of the current git branch"
   (let ((branch-name (shell-command-to-string "git rev-parse --abbrev-ref HEAD")))
-    (if (string-match "^\\([A-z]+/\\)?\\([A-z]+-[0-9]+\\)-.*$" branch-name)
+    (if (string-match "^\\([A-z]+/\\)?\\([A-z]+-[0-9]+\\)[-_].*$" branch-name)
         (match-string 2 branch-name)))
   )
 
@@ -601,14 +611,18 @@
   'action #'kpz/yt-on-shortcode-button)
 
 (defun kpz/yt-on-shortcode-button (button)
-  (browse-url (kpz/yt-issue-url (buffer-substring (button-start button) (button-end button)))))
+  (let ((issue_comment_ids (kpz/yt-parse-shortcode-and-comment-id (buffer-substring (button-start button) (button-end button)))))
+    (message "%s" (buffer-substring (button-start button) (button-end button)))
+    (browse-url (if (cdr issue_comment_ids)
+                    (kpz/yt-issue-comment-url (car issue_comment_ids) (cdr issue_comment_ids))
+                  (kpz/yt-issue-url (car issue_comment_ids))))))
 
 (defun kpz/yt-shortcode-buttonize-buffer ()
   "turn all issue shortcodes into buttons"
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    (while (re-search-forward "[^A-z0-9-]\\([A-z]+-[0-9]+\\)[^A-z0-9-]" nil t)
+    (while (re-search-forward "[^A-z0-9-]\\([A-z]+-[0-9]+\\(#[0-9-]+\\)?\\)[^A-z0-9-]" nil t)
       (make-button (match-beginning 1) (match-end 1) :type 'shortcode-button))))
 
 (add-hook 'org-mode-hook 'kpz/yt-shortcode-buttonize-buffer)
