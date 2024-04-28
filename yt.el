@@ -430,37 +430,6 @@
                 yt-buffer-curlevel curlevel
                 yt-buffer-issue-id issue-id)))
 
-(defun kpz/yt-update-remote-node-editable ()
-  "Update a node on remote side after editing locally"
-  (interactive)
-  (let* ((type-str (kpz/yt-find-node))
-         (type (if (string= type-str "description")
-                   'description
-                 (if (string= type-str "comment")
-                     'comment
-                   (user-error (format "Unknown node type: %s" type-str)))))
-         (issue-id (org-entry-get (point) "YT_SHORTCODE" t))
-         (node-id (org-entry-get (point) "YT_ID" t))
-         (content (if (eq type 'description)
-                      (alist-get 'description (kpz/yt-retrieve-issue-alist issue-id))
-                    (alist-get 'text (kpz/yt-retrieve-issue-comment-alist issue-id node-id))))
-         (remote-hash (if content (sha1 content) ""))
-         (local-hash (org-entry-get (point) "YT_CONTENT_HASH" t))
-         (wconf (current-window-configuration))
-         )
-    (kpz/yt-add-issue-to-history issue-id)
-    (when (not (string= local-hash remote-hash))
-        (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
-
-    (org-gfm-export-as-markdown nil t)
-    (replace-regexp "^#" "##" nil (point-min) (point-max))
-    (yt-commit-update-node-mode)
-    (setq-local yt-buffer-wconf wconf
-                yt-buffer-commit-type type
-                yt-buffer-issue-id issue-id
-                yt-buffer-node-id node-id))
-  )
-
 (defun kpz/yt-new-comment ()
   "Send the current subtree as comment to a ticket"
   (interactive)
@@ -492,6 +461,37 @@
                   ;;   (org-set-property "YT_SHORTCODE" issue-id))
                   )))))
   (widen))
+
+(defun kpz/yt-update-remote-node-editable ()
+  "Update a node on remote side after editing locally"
+  (interactive)
+  (let* ((type-str (kpz/yt-find-node))
+         (type (if (string= type-str "description")
+                   'description
+                 (if (string= type-str "comment")
+                     'comment
+                   (user-error (format "Unknown node type: %s" type-str)))))
+         (issue-id (org-entry-get (point) "YT_SHORTCODE" t))
+         (node-id (org-entry-get (point) "YT_ID" t))
+         (content (if (eq type 'description)
+                      (alist-get 'description (kpz/yt-retrieve-issue-alist issue-id))
+                    (alist-get 'text (kpz/yt-retrieve-issue-comment-alist issue-id node-id))))
+         (remote-hash (if content (sha1 content) ""))
+         (local-hash (org-entry-get (point) "YT_CONTENT_HASH" t))
+         (wconf (current-window-configuration))
+         )
+    (kpz/yt-add-issue-to-history issue-id)
+    (when (not (string= local-hash remote-hash))
+        (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
+
+    (org-gfm-export-as-markdown nil t)
+    (replace-regexp "^#" "##" nil (point-min) (point-max))
+    (yt-commit-update-node-mode)
+    (setq-local yt-buffer-wconf wconf
+                yt-buffer-commit-type type
+                yt-buffer-issue-id issue-id
+                yt-buffer-node-id node-id))
+  )
 
 (defun kpz/yt-update-remote-node ()
   "Update a node on remote side after editing locally"
