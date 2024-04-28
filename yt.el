@@ -394,12 +394,13 @@
            (cond ((eq yt-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
                  ((eq yt-make-new-comment-behavior 'link)
                   (kill-region (point-min) (point-max))
-                  (insert (format "%s#%s" issue-id new-node-id)))
+                  (insert (format "%s#%s\n" issue-id new-node-id)))
                  ((eq yt-make-new-comment-behavior 'fetch)
                   (kill-region (point-min) (point-max))
                   (kpz/yt-get-insert-remote-node issue-id new-node-id 'comment curlevel)
                   ))))
-    (widen)))
+    (widen)
+    (kpz/yt-shortcode-buttonize-buffer)))
 
 (defun kpz/yt-commit-update-node ()
   "Commit the buffer to youtrack to update a node"
@@ -452,7 +453,7 @@
            (cond ((eq yt-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
                  ((eq yt-make-new-comment-behavior 'link)
                   (kill-region (point-min) (point-max))
-                  (insert (format "%s#%s" issue-id new-node-id)))
+                  (insert (format "%s#%s\n" issue-id new-node-id)))
                  ((eq yt-make-new-comment-behavior 'fetch)
                   (kill-region (point-min) (point-max))
                   (kpz/yt-get-insert-remote-node issue-id new-node-id 'comment curlevel)
@@ -460,7 +461,8 @@
                   ;; (unless (org-entry-get (point) "YT_SHORTCODE" t)
                   ;;   (org-set-property "YT_SHORTCODE" issue-id))
                   )))))
-  (widen))
+  (widen)
+  (kpz/yt-shortcode-buttonize-buffer))
 
 (defun kpz/yt-update-remote-node-editable ()
   "Update a node on remote side after editing locally"
