@@ -652,6 +652,13 @@
 (add-hook 'org-mode-hook 'kpz/yt-shortcode-buttonize-buffer)
 
 ;; * interactive
+(defun kpz/yt-heading-set-shortcode ()
+  "Set Property YT_SHORTCODE on headline and append tag YT"
+  (interactive)
+  (org-set-property "YT_SHORTCODE" (org-read-property-value "YT_SHORTCODE"))
+  (let ((tags (org-get-tags)))
+    (if (member "YT" tags) nil (org-set-tags (append (list "YT") tags)))))
+
 (defun kpz/yt-query-browse ()
   "Open an issue in the webbrowser"
   (interactive)
