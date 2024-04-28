@@ -125,6 +125,11 @@
   "Return the shortcode defined by an org property YT_SHORTCODE or nil"
   (org-entry-get (point) "YT_SHORTCODE" t))
 
+(defun kpz/yt-comment-id-from-org-property ()
+  "Return the comment id defined by an org property YT_ID or nil. Returns also nil if this is not a comment"
+  (if (string= "comment" (org-entry-get (point) "YT_TYPE" t))
+      (org-entry-get (point) "YT_ID" t)))
+
 (defun kpz/yt-shortcode-from-branch ()
   "Return the shortcode from the name of the current git branch"
   (let ((branch-name (shell-command-to-string "git rev-parse --abbrev-ref HEAD")))
@@ -141,11 +146,25 @@
           (let ((issue (kpz/yt-shortcode-from-branch)))
             (if issue issue nil)))))))
 
+(defun kpz/yt-guess-shortcode-and-comment-id ()
+  "Return a shortcode from current context."
+  (let ((issue-comment-ids (kpz/yt-shortcode-and-comment-id-from-point)))
+    (if issue-comment-ids issue-comment-ids
+      (let ((issue (kpz/yt-shortcode-from-org-property)))
+        (if issue (cons issue (kpz/yt-comment-id-from-org-property))
+          (let ((issue (kpz/yt-shortcode-from-branch)))
+            (if issue (cons issue nil) nil)))))))
+
 (defun kpz/yt-guess-or-query-shortcode ()
   "Guess shortcode on context or start a query."
   (let ((guess (kpz/yt-guess-shortcode)))
     (if guess guess (kpz/yt-query-shortcode)))
   )
+
+(defun kpz/yt-guess-or-query-shortcode-and-comment-id ()
+  "Guess shortcode on context or start a query."
+  (let ((guess (kpz/yt-guess-shortcode-and-comment-id)))
+    (if guess guess (cons kpz/yt-query-shortcode nil))))
 
 ;; history
 (defun kpz/yt-retrieve-history-issues-alist ()
@@ -610,12 +629,15 @@
   'follow-link t
   'action #'kpz/yt-on-shortcode-button)
 
+(defun kpz/yt-browse (shortcode &optional comment-id)
+  "Open an issue in browser and focus a comment, if comment-id is given."
+  (browse-url (if comment-id
+                  (kpz/yt-issue-comment-url shortcode comment-id)
+                (kpz/yt-issue-url shortcode))))
+
 (defun kpz/yt-on-shortcode-button (button)
-  (let ((issue_comment_ids (kpz/yt-parse-shortcode-and-comment-id (buffer-substring (button-start button) (button-end button)))))
-    (message "%s" (buffer-substring (button-start button) (button-end button)))
-    (browse-url (if (cdr issue_comment_ids)
-                    (kpz/yt-issue-comment-url (car issue_comment_ids) (cdr issue_comment_ids))
-                  (kpz/yt-issue-url (car issue_comment_ids))))))
+  (let ((issue-comment-ids (kpz/yt-parse-shortcode-and-comment-id (buffer-substring (button-start button) (button-end button)))))
+    (kpz/yt-browse (car issue-comment-ids) (cdr issue-comment-ids))))
 
 (defun kpz/yt-shortcode-buttonize-buffer ()
   "turn all issue shortcodes into buttons"
@@ -640,11 +662,9 @@
 (defun kpz/yt-smart-query-browse ()
   "Open an issue in the webbrowser"
   (interactive)
-  (let* ((shortcode (kpz/yt-guess-or-query-shortcode)))
-    (kpz/yt-add-issue-to-history shortcode)
-    (browse-url (kpz/yt-issue-url shortcode))
-    )
-  )
+  (let* ((issue-comment-ids (kpz/yt-guess-or-query-shortcode-and-comment-id)))
+    (kpz/yt-add-issue-to-history (car issue-comment-ids))
+    (kpz/yt-browse (car issue-comment-ids) (cdr issue-comment-ids))))
 
 (defun kpz/yt-query-refine-browse ()
   "Edit a predefined query to find an issue and open it in the browser"
