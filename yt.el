@@ -210,7 +210,7 @@
   (kpz/yt-plz 'get (concat yt-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,author(login)")))
 
 (defun kpz/yt-send-new-comment-alist (issue-id alist)
-  "Send the information in ALIST a new comment for ticket with id ISSUE-ID"
+  "Send the information in ALIST as a new comment for ticket with id ISSUE-ID"
   (kpz/yt-plz 'post (concat yt-baseurl "/api/issues/" issue-id "/comments/") (json-encode alist)))
 
 (defun kpz/yt-send-issue-comment-alist (issue-id comment-id alist)
@@ -298,6 +298,7 @@
       lowest-level)))
 
 (defun kpz/yt-first-heading-level ()
+  "Determine the level of the first heading in buffer"
   (org-fold-show-all)
   (goto-char (point-min))
   (when (not (org-at-heading-p))
@@ -381,26 +382,38 @@
   (widen)
   )
 
+(defun kpz/yt-commit-new-comment ()
+  "Commit buffer content as a new comment"
+  (setq new-node-id (alist-get 'id (kpz/yt-send-new-comment-alist yt-buffer-issue-id `((text . ,(buffer-string))))))
+  (kpz/yt-add-issue-to-history yt-buffer-issue-id)
+  (set-window-configuration yt-buffer-wconf)
+  (cond (new-node-id
+         (message "New comment created on %s with node id %s." yt-buffer-issue-id new-node-id)
+         (cond ((eq yt-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
+               ((eq yt-make-new-comment-behavior 'link)
+                (kill-region (point-min) (point-max))
+                (insert (format "%s#%s\n" yt-buffer-issue-id new-node-id)))
+               ((eq yt-make-new-comment-behavior 'fetch)
+                (kill-region (point-min) (point-max))
+                (kpz/yt-get-insert-remote-node yt-buffer-issue-id new-node-id 'comment yt-buffer-curlevel)
+                )))))
+
+(defun kpz/yt-commit-new-issue ()
+  "Commit buffer content as a new issue"
+  (kpz/yt-browse-new-issue yt-new-issue-title (buffer-string))
+  (set-window-configuration yt-buffer-wconf)
+  (kill-region (point-min) (point-max))
+  (insert "/(Issue created from deleted content)/\n"))
+
 (defun kpz/yt-commit-new-node ()
   "Commit the buffer to youtrack to create a new node"
   (interactive)
-  (setq new-node-id (alist-get 'id (kpz/yt-send-new-comment-alist yt-buffer-issue-id `((text . ,(buffer-string))))))
-  (kpz/yt-add-issue-to-history yt-buffer-issue-id)
-  (let ((curlevel yt-buffer-curlevel)
-        (issue-id yt-buffer-issue-id))
-    (set-window-configuration yt-buffer-wconf)
-    (cond (new-node-id
-           (message "New comment created on %s with node id %s." issue-id new-node-id)
-           (cond ((eq yt-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
-                 ((eq yt-make-new-comment-behavior 'link)
-                  (kill-region (point-min) (point-max))
-                  (insert (format "%s#%s\n" issue-id new-node-id)))
-                 ((eq yt-make-new-comment-behavior 'fetch)
-                  (kill-region (point-min) (point-max))
-                  (kpz/yt-get-insert-remote-node issue-id new-node-id 'comment curlevel)
-                  ))))
-    (widen)
-    (kpz/yt-shortcode-buttonize-buffer)))
+  (cl-case yt-buffer-node-type
+    (comment (kpz/yt-commit-new-comment))
+    (issue (kpz/yt-commit-new-issue))
+    (t (user-error "Bad node type %s" yt-buffer-node-type)))
+  (widen)
+  (kpz/yt-shortcode-buttonize-buffer))
 
 (defun kpz/yt-commit-update-node ()
   "Commit the buffer to youtrack to update a node"
@@ -413,15 +426,17 @@
   (kpz/yt-fetch-remote-node))
 
 
-(defun kpz/yt-new-comment-editable ()
-  "Send the current subtree as comment to a ticket"
-  (interactive)
-  (cond ((region-active-p) (narrow-to-region (mark) (point)))
+(defun kpz/yt-new-node-editable (type)
+  "Use the current subtree or region to create a new comment or issue depending on TYPE to be either 'comment or 'issue"
+  (cond ((and (eq type 'comment) (region-active-p)) (narrow-to-region (mark) (point)))
         (t (org-narrow-to-subtree)))
   (goto-char (point-min))
-
+  (cond ((eq type 'issue)
+         (setq title (org-get-heading t t t t))
+         (kill-whole-line)))
   (let ((wconf (current-window-configuration))
-        (issue-id (kpz/yt-guess-or-query-shortcode))
+        (issue-id (if (eq type 'comment)
+                      (kpz/yt-guess-or-query-shortcode)))
         (curlevel (kpz/yt-max-heading-level)))
     (org-gfm-export-as-markdown nil nil)
     (markdown-mode)
@@ -429,7 +444,14 @@
     (yt-commit-new-node-mode)
     (setq-local yt-buffer-wconf wconf
                 yt-buffer-curlevel curlevel
-                yt-buffer-issue-id issue-id)))
+                yt-buffer-issue-id issue-id
+                yt-buffer-node-type type
+                yt-new-issue-title title)))
+
+(defun kpz/yt-new-comment-editable ()
+  "Send the current subtree or regio as comment to a ticket"
+  (interactive)
+  (kpz/yt-new-node-editable 'comment))
 
 (defun kpz/yt-new-comment ()
   "Send the current subtree as comment to a ticket"
@@ -689,6 +711,16 @@
     (browse-url (kpz/yt-issue-url choice-id))
     )
   )
+
+(defun kpz/yt-new-issue ()
+  "Use the current subtree to create a new issue"
+  (interactive)
+  (kpz/yt-new-node-editable 'issue))
+
+(defun kpz/yt-browse-new-issue (title description)
+  "Open web browser to create a new issue"
+  (browse-url (concat yt-baseurl "/newIssue?description=" description "&summary=" title)))
+
 
 ;; * helm
 (if (require 'helm nil t)
