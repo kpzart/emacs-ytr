@@ -386,17 +386,19 @@
   "Commit buffer content as a new comment"
   (setq new-node-id (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-id `((text . ,(buffer-string))))))
   (ytr-add-issue-to-history ytr-buffer-issue-id)
-  (set-window-configuration ytr-buffer-wconf)
-  (cond (new-node-id
-         (message "New comment created on %s with node id %s." ytr-buffer-issue-id new-node-id)
-         (cond ((eq ytr-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
-               ((eq ytr-make-new-comment-behavior 'link)
-                (kill-region (point-min) (point-max))
-                (insert (format "%s#%s\n" ytr-buffer-issue-id new-node-id)))
-               ((eq ytr-make-new-comment-behavior 'fetch)
-                (kill-region (point-min) (point-max))
-                (ytr-get-insert-remote-node ytr-buffer-issue-id new-node-id 'comment ytr-buffer-curlevel)
-                )))))
+  (let ((issue-id ytr-buffer-issue-id) ;; These vars are buffer local and we are going to switch buffer
+        (curlevel ytr-buffer-curlevel))
+    (set-window-configuration ytr-buffer-wconf)
+    (cond (new-node-id
+           (message "New comment created on %s with node id %s." issue-id new-node-id)
+           (cond ((eq ytr-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
+                 ((eq ytr-make-new-comment-behavior 'link)
+                  (kill-region (point-min) (point-max))
+                  (insert (format "%s#%s\n" issue-id new-node-id)))
+                 ((eq ytr-make-new-comment-behavior 'fetch)
+                  (kill-region (point-min) (point-max))
+                  (ytr-get-insert-remote-node issue-id new-node-id 'comment curlevel)
+                  ))))))
 
 (defun ytr-commit-new-issue ()
   "Commit buffer content as a new issue"
@@ -428,6 +430,7 @@
 
 (defun ytr-new-node-editable (type)
   "Use the current subtree or region to create a new comment or issue depending on TYPE to be either 'comment or 'issue"
+  (setq title nil)
   (cond ((and (eq type 'comment) (region-active-p)) (narrow-to-region (mark) (point)))
         (t (org-narrow-to-subtree)))
   (goto-char (point-min))
