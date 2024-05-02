@@ -134,8 +134,7 @@
   "Return the shortcode from the name of the current git branch"
   (let ((branch-name (shell-command-to-string "git rev-parse --abbrev-ref HEAD")))
     (if (string-match "^\\([A-z]+/\\)?\\([A-z]+-[0-9]+\\)[-_].*$" branch-name)
-        (match-string 2 branch-name)))
-  )
+        (match-string 2 branch-name))))
 
 (defun ytr-guess-shortcode ()
   "Return a shortcode from current context."
@@ -420,41 +419,54 @@
 (defun ytr-commit-update-node ()
   "Commit the buffer to youtrack to update a node"
   (interactive)
-  (if (eq ytr-buffer-commit-type 'description)
-      (ytr-send-issue-alist ytr-buffer-issue-id `((description . ,(buffer-string))))
-    (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
+  (cl-case ytr-buffer-node-type
+    (description (ytr-send-issue-alist ytr-buffer-issue-id `((description . ,(buffer-string)))))
+    (comment (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
+    (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
   (message "Node successfully updated")
   (set-window-configuration ytr-buffer-wconf)
   (ytr-fetch-remote-node))
 
 
-(defun ytr-new-node-editable (type)
-  "Use the current subtree or region to create a new comment or issue depending on TYPE to be either 'comment or 'issue"
-  (setq title nil)
-  (cond ((and (eq type 'comment) (region-active-p)) (narrow-to-region (mark) (point)))
+(defun ytr-new-comment-editable ()
+  "Send the current subtree or regio as comment to a ticket"
+  (interactive)
+  (cond ((region-active-p) (narrow-to-region (mark) (point)))
         (t (org-narrow-to-subtree)))
   (goto-char (point-min))
-  (cond ((eq type 'issue)
-         (setq title (org-get-heading t t t t))
-         (kill-whole-line)))
   (let ((wconf (current-window-configuration))
-        (issue-id (if (eq type 'comment)
-                      (ytr-guess-or-query-shortcode)))
+        (issue-id (ytr-guess-or-query-shortcode))
         (curlevel (ytr-max-heading-level)))
     (org-gfm-export-as-markdown nil nil)
     (markdown-mode)
     (replace-regexp "^#" "##" nil (point-min) (point-max))
     (ytr-commit-new-node-mode)
+    (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
     (setq-local ytr-buffer-wconf wconf
                 ytr-buffer-curlevel curlevel
                 ytr-buffer-issue-id issue-id
-                ytr-buffer-node-type type
-                ytr-new-issue-title title)))
+                ytr-buffer-node-type 'comment
+                ytr-buffer-commit-type 'create)))
 
-(defun ytr-new-comment-editable ()
-  "Send the current subtree or regio as comment to a ticket"
+(defun ytr-new-issue ()
+  "Use the current subtree to create a new issue"
   (interactive)
-  (ytr-new-node-editable 'comment))
+  (org-narrow-to-subtree)
+  (goto-char (point-min))
+  (setq title (org-get-heading t t t t))
+  (kill-whole-line)
+  (let ((wconf (current-window-configuration))
+        (curlevel (ytr-max-heading-level)))
+    (org-gfm-export-as-markdown nil nil)
+    (markdown-mode)
+    (replace-regexp "^#" "##" nil (point-min) (point-max))
+    (ytr-commit-new-node-mode)
+    (message "Create new issue with title: %s. C-c to submit, C-k to cancel" title)
+    (setq-local ytr-buffer-wconf wconf
+                ytr-buffer-curlevel curlevel
+                ytr-buffer-node-type 'issue
+                ytr-buffer-commit-type 'create
+                ytr-new-issue-title title)))
 
 (defun ytr-new-comment ()
   "Send the current subtree as comment to a ticket"
@@ -467,7 +479,8 @@
          (new-node-id (save-window-excursion
                         (org-gfm-export-as-markdown nil nil)
                         (markdown-mode)
-                        (replace-regexp "^#" "##" nil (point-min) (point-max))
+                        (let ((inhibit-message t))
+                          (replace-regexp "^#" "##" nil (point-min) (point-max)))
                         (when (y-or-n-p (format "Create new comment for ticket %s from this content?" issue-id))
                           (alist-get 'id (ytr-send-new-comment-alist issue-id `((text . ,(buffer-string)))))
                           )
@@ -500,9 +513,9 @@
                    (user-error (format "Unknown node type: %s" type-str)))))
          (issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
          (node-id (org-entry-get (point) "YTR_ID" t))
-         (content (if (eq type 'description)
-                      (alist-get 'description (ytr-retrieve-issue-alist issue-id))
-                    (alist-get 'text (ytr-retrieve-issue-comment-alist issue-id node-id))))
+         (content (cl-case type
+                    (description (alist-get 'description (ytr-retrieve-issue-alist issue-id)))
+                    (comment (alist-get 'text (ytr-retrieve-issue-comment-alist issue-id node-id)))))
          (remote-hash (if content (sha1 content) ""))
          (local-hash (org-entry-get (point) "YTR_CONTENT_HASH" t))
          (wconf (current-window-configuration))
@@ -513,12 +526,13 @@
 
     (org-gfm-export-as-markdown nil t)
     (replace-regexp "^#" "##" nil (point-min) (point-max))
-    (ytr-commit-update-node-mode)
     (setq-local ytr-buffer-wconf wconf
-                ytr-buffer-commit-type type
+                ytr-buffer-commit-type 'update
+                ytr-buffer-node-type type
                 ytr-buffer-issue-id issue-id
-                ytr-buffer-node-id node-id))
-  )
+                ytr-buffer-node-id node-id)
+    (ytr-commit-update-node-mode)
+    (message "Update %s with ID %s on issue %s" type node-id issue-id)))
 
 (defun ytr-update-remote-node ()
   "Update a node on remote side after editing locally"
@@ -544,7 +558,8 @@
     (when (save-window-excursion
             (org-gfm-export-as-markdown nil t)
             (markdown-mode)
-            (replace-regexp "^#" "##" nil (point-min) (point-max))
+            (let ((inhibit-message t))
+              (replace-regexp "^#" "##" nil (point-min) (point-max)))
             (when (y-or-n-p (format "Update %s with id %s of ticket %s with this content?" type node-id issue-id))
               (if (eq type 'description)
                   (ytr-send-issue-alist issue-id `((description . ,(buffer-string))))
@@ -714,11 +729,6 @@
     (browse-url (ytr-issue-url choice-id))
     )
   )
-
-(defun ytr-new-issue ()
-  "Use the current subtree to create a new issue"
-  (interactive)
-  (ytr-new-node-editable 'issue))
 
 (defun ytr-browse-new-issue (title description)
   "Open web browser to create a new issue"
