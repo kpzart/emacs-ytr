@@ -66,21 +66,25 @@
   "Return the URL for a query"
   (concat ytr-baseurl "/issues?q=" (url-hexify-string query)))
 
-(defun ytr-completing-read-annotated (prompt choices-annotated)
-  "Like competing-read but receives a sequence of (choice . annotations) cons cells."
+(defun ytr-completing-read-categorised (prompt choices category)
+  "Like competing-read but puts a category on the choices."
   ;; (completing-read prompt choices-annotated)
   (completing-read prompt (lambda (str pred flag)
                             (pcase flag
-                              ('metadata `(metadata (annotation-function . ,(lambda (choice)
-                                                                              (let ((annotation (cdr (assoc choice choices-annotated))))
-                                                                                (marginalia--fields (annotation)))
-                                                                              ))))
+                              ('metadata `(metadata (category . ,category)))
                               (_
-                               (all-completions str choices-annotated pred))))))
+                               (all-completions str choices pred))))))
 
-;; Test Code
-;; (ytr-completing-read-annotated "Test: " '(("A" . "Attr A1") ("BB" . "Attr B1"))) ;; works
-;; (ytr-completing-read-annotated "Test: " '(("A" . ("Attr A1" "Attr A2")) ("B" . ("Attr B1" "Attr B2")))) ;; doesnt work yet
+(defun ytr-annotate-shortcode (cand)
+  "Annotate issue shortcode with some info"
+  (let ((issue-alist (find-if (lambda (elem) (string= (alist-get 'idReadable elem) cand)) result)))
+    (let-alist issue-alist
+      (marginalia--fields
+       (:left .summary :format " %s" :face 'marginalia-type)
+       ((ytr-get-customField-value issue-alist "State") :format "State: %s" :truncate .5 :face 'marginalia-documentation)
+       ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)):truncate 16 :face 'marginalia-documentation)
+       ))
+    ))
 
 (defun ytr-query-shortcode ()
   "Return a shortcode from a query"
@@ -93,17 +97,17 @@
     (car (split-string choice ":")))
   )
 
-(defun ytr-query-shortcode-annoted ()
+;; * annotation
+
+(defun ytr-query-shortcode-annotated ()
   "Return a shortcode from a query"
   (let* ((query (completing-read "Query: " ytr-queries nil nil))
          (result (ytr-retrieve-query-issues-alist query))
-         (choices-annotated (mapcar (lambda (item)
-                                      (cons
-                                       (concat (alist-get 'idReadable item) ": " (alist-get 'summary item))
-                                       (concat "Shortcode: " (alist-get 'idReadable item)))) ; this is a dummy
-                                    result))
-         (choice (ytr-completing-read-annotated "Issue: " choices-annotated)))
-    (car (split-string choice ":"))))
+         (choices (mapcar (lambda (item)
+                            (alist-get 'idReadable item))
+                          result))
+         (choice (ytr-completing-read-categorised "Issue: " choices 'ytr-shortcode)))
+    choice))
 
 (add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9A-z-#" "" ""))
 
@@ -157,13 +161,13 @@
 (defun ytr-guess-or-query-shortcode ()
   "Guess shortcode on context or start a query."
   (let ((guess (ytr-guess-shortcode)))
-    (if guess guess (ytr-query-shortcode)))
+    (if guess guess (ytr-query-shortcode-annotated)))
   )
 
 (defun ytr-guess-or-query-shortcode-and-comment-id ()
   "Guess shortcode on context or start a query."
   (let ((guess (ytr-guess-shortcode-and-comment-id)))
-    (if guess guess (cons ytr-query-shortcode nil))))
+    (if guess guess (cons ytr-query-shortcode-annotated nil))))
 
 ;; history
 (defun ytr-retrieve-history-issues-alist ()
@@ -198,7 +202,7 @@
 
 (defun ytr-retrieve-query-issues-alist (query)
   "Retrieve list of issues by query"
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,reporter,created,resolved&query=" (url-hexify-string query))))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,reporter,created,resolved,customFields(name,value(name))&query=" (url-hexify-string query))))
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
@@ -626,7 +630,7 @@
 (defun ytr-query-org ()
   "Retrieve an issue and convert it to a temporary org buffer"
   (interactive)
-  (let ((shortcode (ytr-query-shortcode)))
+  (let ((shortcode (ytr-query-shortcode-annotated)))
     (ytr-add-issue-to-history shortcode)
     (ytr-org shortcode))
   )
@@ -700,7 +704,7 @@
 (defun ytr-query-browse ()
   "Open an issue in the webbrowser"
   (interactive)
-  (let* ((shortcode (ytr-query-shortcode)))
+  (let* ((shortcode (ytr-query-shortcode-annotated)))
     (ytr-add-issue-to-history shortcode)
     (browse-url (ytr-issue-url shortcode))
     )
