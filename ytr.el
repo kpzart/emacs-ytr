@@ -274,18 +274,16 @@
                     )
                   ))
               .links)
-      (ytr-org-insert-node .description 2 'description shortcode .id (alist-get 'login .reporter) .created)
       ;; do the comments
       (mapcar (lambda (comment-alist)
                 (let-alist comment-alist
                   (ytr-org-insert-node .text 2 'comment shortcode .id (alist-get 'login .author) .created)))
               .comments)
-
+      ;; do the description
+      (ytr-org-insert-node .description 2 'description shortcode .id (alist-get 'login .reporter) .created)
       ;; postprocess
       (org-unindent-buffer)
-      (switch-to-buffer bufname)
-      ))
-  )
+      (switch-to-buffer bufname))))
 
 (defun ytr-max-heading-level ()
   "Determine the highest Heading in the buffer. Return nil if no heading found."
