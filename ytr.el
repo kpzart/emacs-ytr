@@ -66,6 +66,22 @@
   "Return the URL for a query"
   (concat ytr-baseurl "/issues?q=" (url-hexify-string query)))
 
+(defun ytr-query-shortcode ()
+  "Return a shortcode from a query"
+  (let* ((query (completing-read "Query: " ytr-queries nil nil))
+         (result (ytr-retrieve-query-issues-alist query))
+         (choices (mapcar (lambda (item)
+                            (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
+                          result))
+         (choice (completing-read "Issue: " choices)))
+    (car (split-string choice ":")))
+  )
+
+;; * annotation
+(require 'marginalia)
+
+(add-to-list 'marginalia-annotator-registry '(ytr-shortcode ytr-annotate-shortcode builtin none))
+
 (defun ytr-completing-read-categorised (prompt choices category)
   "Like competing-read but puts a category on the choices."
   ;; (completing-read prompt choices-annotated)
@@ -85,19 +101,6 @@
        ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)):truncate 16 :face 'marginalia-documentation)
        ))
     ))
-
-(defun ytr-query-shortcode ()
-  "Return a shortcode from a query"
-  (let* ((query (completing-read "Query: " ytr-queries nil nil))
-         (result (ytr-retrieve-query-issues-alist query))
-         (choices (mapcar (lambda (item)
-                            (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
-                          result))
-         (choice (completing-read "Issue: " choices)))
-    (car (split-string choice ":")))
-  )
-
-;; * annotation
 
 (defun ytr-query-shortcode-annotated ()
   "Return a shortcode from a query"
