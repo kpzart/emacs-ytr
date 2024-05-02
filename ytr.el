@@ -167,7 +167,7 @@
 (defun ytr-guess-or-query-shortcode-and-comment-id ()
   "Guess shortcode on context or start a query."
   (let ((guess (ytr-guess-shortcode-and-comment-id)))
-    (if guess guess (cons ytr-query-shortcode-annotated nil))))
+    (if guess guess (cons (ytr-query-shortcode-annotated) nil))))
 
 ;; history
 (defun ytr-retrieve-history-issues-alist ()
@@ -627,21 +627,17 @@
   (goto-char (point-min))
   )
 
-(defun ytr-query-org ()
+(defun ytr-query-org (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
-  (interactive)
-  (let ((shortcode (ytr-query-shortcode-annotated)))
-    (ytr-add-issue-to-history shortcode)
-    (ytr-org shortcode))
-  )
+  (interactive (list (ytr-query-shortcode-annotated)))
+  (ytr-add-issue-to-history shortcode)
+  (ytr-org shortcode))
 
-(defun ytr-smart-query-org ()
+(defun ytr-smart-query-org (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
-  (interactive)
-  (let ((shortcode (ytr-guess-or-query-shortcode)))
-    (ytr-add-issue-to-history shortcode)
-    (ytr-org shortcode))
-  )
+  (interactive (list (ytr-guess-or-query-shortcode)))
+  (ytr-add-issue-to-history shortcode)
+  (ytr-org shortcode))
 
 ;; * preview
 
@@ -661,11 +657,10 @@
   (with-output-to-temp-buffer "*ytr-describe-issue*"
     (ytr-sneak issue-alist)))
 
-(defun ytr-smart-query-sneak ()
+(defun ytr-smart-query-sneak (shortcode)
   "Display a side window with the description and same basic information on issue with SHORTCODE"
-  (interactive)
-  (ytr-sneak-window (ytr-retrieve-issue-alist (ytr-guess-or-query-shortcode)))
-  )
+  (interactive (list (ytr-guess-or-query-shortcode)))
+  (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
 
 ;; * Issue buttons
 
@@ -701,21 +696,17 @@
   (let ((tags (org-get-tags)))
     (if (member "YTR" tags) nil (org-set-tags (append (list "YTR") tags)))))
 
-(defun ytr-query-browse ()
+(defun ytr-query-browse (shortcode)
   "Open an issue in the webbrowser"
-  (interactive)
-  (let* ((shortcode (ytr-query-shortcode-annotated)))
-    (ytr-add-issue-to-history shortcode)
-    (browse-url (ytr-issue-url shortcode))
-    )
-  )
+  (interactive (list (ytr-query-shortcode-annotated)))
+  (ytr-add-issue-to-history shortcode)
+  (browse-url (ytr-issue-url shortcode)))
 
-(defun ytr-smart-query-browse ()
+(defun ytr-smart-query-browse (issue-comment-ids)
   "Open an issue in the webbrowser"
-  (interactive)
-  (let* ((issue-comment-ids (ytr-guess-or-query-shortcode-and-comment-id)))
-    (ytr-add-issue-to-history (car issue-comment-ids))
-    (ytr-browse (car issue-comment-ids) (cdr issue-comment-ids))))
+  (interactive (list (ytr-guess-or-query-shortcode-and-comment-id)))
+  (ytr-add-issue-to-history (car issue-comment-ids))
+  (ytr-browse (car issue-comment-ids) (cdr issue-comment-ids)))
 
 (defun ytr-query-refine-browse ()
   "Edit a predefined query to find an issue and open it in the browser"
