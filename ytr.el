@@ -69,10 +69,10 @@
 (defun ytr-query-shortcode ()
   "Return a shortcode from a query"
   (let* ((query (completing-read "Query: " ytr-queries nil nil))
-         (result (ytr-retrieve-query-issues-alist query))
+         (issues-alist (ytr-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
                             (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
-                          result))
+                          issues-alist))
          (choice (completing-read "Issue: " choices)))
     (car (split-string choice ":")))
   )
@@ -83,8 +83,7 @@
 (add-to-list 'marginalia-annotator-registry '(ytr-shortcode ytr-annotate-shortcode builtin none))
 
 (defun ytr-completing-read-categorised (prompt choices category)
-  "Like competing-read but puts a category on the choices."
-  ;; (completing-read prompt choices-annotated)
+  "Like completing-read but puts a category on the choices."
   (completing-read prompt (lambda (str pred flag)
                             (pcase flag
                               ('metadata `(metadata (category . ,category)))
@@ -93,7 +92,7 @@
 
 (defun ytr-annotate-shortcode (cand)
   "Annotate issue shortcode with some info"
-  (let ((issue-alist (find-if (lambda (elem) (string= (alist-get 'idReadable elem) cand)) result)))
+  (let ((issue-alist (find-if (lambda (elem) (string= (alist-get 'idReadable elem) cand)) issues-alist))) ;; issues-alist comes from ytr-query-shortcode-annotated via lexical binding!
     (let-alist issue-alist
       (marginalia--fields
        (:left .summary :format " %s" :face 'marginalia-type)
@@ -104,13 +103,15 @@
 
 (defun ytr-query-shortcode-annotated ()
   "Return a shortcode from a query"
-  (let* ((query (completing-read "Query: " ytr-queries nil nil))
-         (result (ytr-retrieve-query-issues-alist query))
-         (choices (mapcar (lambda (item)
-                            (alist-get 'idReadable item))
-                          result))
-         (choice (ytr-completing-read-categorised "Issue: " choices 'ytr-shortcode)))
-    choice))
+  (interactive)
+  (let ((query (completing-read "Query: " ytr-queries nil nil)))
+    (if (string-match-p "^[A-z]+-[0-9]+$" query) query ;; if query is already a shortcode
+      (let ((issues-alist (ytr-retrieve-query-issues-alist query)))
+        (if (length> issues-alist 0)
+            (ytr-completing-read-categorised "Issue: "
+                                             (mapcar (lambda (item) (alist-get 'idReadable item)) issues-alist)
+                                             'ytr-shortcode)
+          (user-error "Query returned empty results."))))))
 
 (add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9A-z-#" "" ""))
 
@@ -716,10 +717,10 @@
   (interactive)
   (let* ((query-orig (completing-read "Query: " ytr-queries nil t))
          (query (read-string "Refine query: " query-orig nil))
-         (result (ytr-retrieve-query-issues-alist query))
+         (issues-alist (ytr-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
                             (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
-                          result))
+                          issues-alist))
          (choice (completing-read "Issue: " choices))
          (choice-id (car (split-string choice ":"))))
     (browse-url (ytr-issue-url choice-id))
@@ -738,12 +739,12 @@
         "Use Helm to select an issue from a query and open it."
         (interactive)
         (let* ((query (completing-read "Query: " ytr-queries nil nil defaultquery))
-               (result (ytr-retrieve-query-issues-alist query))
+               (issues-alist (ytr-retrieve-query-issues-alist query))
                (choices (mapcar (lambda (issue-alist)
                                   (let-alist issue-alist
                                     (cons (format "%s: %s" .idReadable .summary) issue-alist))
                                   )
-                                result))
+                                issues-alist))
                )
           (if choices
               (helm :sources (helm-build-sync-source
@@ -773,12 +774,12 @@
       (defun ytr-helm-history ()
         "Use Helm to select an issue from issue history and open it."
         (interactive)
-        (let* ((result (ytr-retrieve-history-issues-alist))
+        (let* ((issues-alist (ytr-retrieve-history-issues-alist))
                (choices (mapcar (lambda (issue-alist)
                                   (let-alist issue-alist
                                     (cons (format "%s: %s" .idReadable .summary) issue-alist))
                                   )
-                                result))
+                                issues-alist))
                )
           (if choices
               (helm :sources (helm-build-sync-source "ytr-issues"
