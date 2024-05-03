@@ -206,7 +206,7 @@
 
 (defun ytr-retrieve-query-issues-alist (query)
   "Retrieve list of issues by query"
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,reporter,created,resolved,customFields(name,value(name))&query=" (url-hexify-string query))))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,reporter,created,resolved,reporter(login),customFields(name,value(name))&query=" (url-hexify-string query))))
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
