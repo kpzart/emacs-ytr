@@ -98,10 +98,10 @@
     (let-alist issue-alist
       (marginalia--fields
        (:left .summary :format " %s" :face 'marginalia-type)
-       ((ytr-get-customField-value issue-alist "State") :format "State: %s" :truncate .5 :face 'marginalia-documentation)
+       ((ytr-get-customField-value issue-alist "State") :format "State: %s" :truncate .3 :face 'marginalia-documentation)
+       ((ytr-get-customField-value issue-alist "Assignee") :format "Assignee: %s" :truncate .3 :face 'marginalia-documentation)
        ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)):truncate 16 :face 'marginalia-documentation)
-       ))
-    ))
+       ))))
 
 (defun ytr-read-shortcode-annotated ()
   "Return a shortcode from a query"
