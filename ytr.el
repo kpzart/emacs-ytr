@@ -55,7 +55,7 @@
 
 (defvar ytr-issue-history '() "History for issues")
 
-;;;; urls and shortcodes
+;;;; urls
 (defun ytr-issue-url (shortcode)
   "Return the URL for a issue given by shortcode"
   (concat ytr-baseurl "/issue/" shortcode))
@@ -68,7 +68,8 @@
   "Return the URL for a query"
   (concat ytr-baseurl "/issues?q=" (url-hexify-string query)))
 
-(defun ytr-query-shortcode ()
+;;;; read shortcode
+(defun ytr-read-shortcode-basic ()
   "Return a shortcode from a query"
   (let* ((query (completing-read "Query: " ytr-queries nil nil))
          (issues-alist (ytr-retrieve-query-issues-alist query))
@@ -79,8 +80,7 @@
     (car (split-string choice ":")))
   )
 
-;;;; annotation
-(require 'marginalia)
+;;;;; marginalia
 
 (add-to-list 'marginalia-annotator-registry '(ytr-shortcode ytr-annotate-shortcode builtin none))
 
@@ -94,7 +94,7 @@
 
 (defun ytr-annotate-shortcode (cand)
   "Annotate issue shortcode with some info"
-  (let ((issue-alist (find-if (lambda (elem) (string= (alist-get 'idReadable elem) cand)) issues-alist))) ;; issues-alist comes from ytr-query-shortcode-annotated via lexical binding!
+  (let ((issue-alist (find-if (lambda (elem) (string= (alist-get 'idReadable elem) cand)) issues-alist))) ;; issues-alist comes from ytr-read-shortcode-annotated via lexical binding!
     (let-alist issue-alist
       (marginalia--fields
        (:left .summary :format " %s" :face 'marginalia-type)
@@ -103,7 +103,7 @@
        ))
     ))
 
-(defun ytr-query-shortcode-annotated ()
+(defun ytr-read-shortcode-annotated ()
   "Return a shortcode from a query"
   (interactive)
   (let ((query (completing-read "Query: " ytr-queries nil nil)))
@@ -115,6 +115,44 @@
                                              'ytr-shortcode)
           (user-error "Query returned empty results."))))))
 
+;;;;; consult
+(defun ytr-consult-state-function (action shortcode)
+  ""
+  (cl-case action
+    (preview (ytr-sneak-window
+               (find-if (lambda (elem) (string= (alist-get 'idReadable elem) shortcode)) issues-alist)))
+    (exit (quit-window))))
+
+(defun ytr-read-shortcode-from-query-consult (query)
+  "use consult to get the shortcode from a given query"
+  (let ((issues-alist (ytr-retrieve-query-issues-alist query))
+        (choices (mapcar (lambda (item) (alist-get 'idReadable item)) issues-alist)))
+    (consult--read choices
+                   :category 'ytr-shortcode
+                   :state 'ytr-consult-state-function
+                   :require-match t
+                   :history 'ytr-issue-history
+                   ;; :add-history (list (ytr-guess-shortcode)) ;; klappt noch nicht
+                   ;; :keymap tobedone
+                   )))
+
+(defun ytr-read-query-consult ()
+  "Use consult to get a query"
+  (consult--read ytr-queries))
+
+(defun ytr-read-shortcode-consult ()
+  "Use consult to read a shortcode"
+  (ytr-read-shortcode-from-query-consult (ytr-read-query-consult)))
+
+;;;;; customvar
+
+(defcustom ytr-read-shortcode-function 'ytr-read-shortcode-basic "Select Input Method to read a shortcode from user" :type 'function :group 'ytr :options '(ytr-read-shortcode-basic ytr-read-shortcode-annotated ytr-read-shortcode-consult))
+
+(defun ytr-read-shortcode ()
+  "Wrapper function to read shortcode from user"
+  (funcall ytr-read-shortcode-function))
+
+;;;; recognize shortcode
 (add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9A-z-#" "" ""))
 
 (defun ytr-parse-shortcode-and-comment-id (candidate)
@@ -164,16 +202,16 @@
           (let ((issue (ytr-shortcode-from-branch)))
             (if issue (cons issue nil) nil)))))))
 
-(defun ytr-guess-or-query-shortcode ()
+(defun ytr-guess-or-read-shortcode ()
   "Guess shortcode on context or start a query."
   (let ((guess (ytr-guess-shortcode)))
-    (if guess guess (ytr-query-shortcode-annotated)))
+    (if guess guess (ytr-read-shortcode)))
   )
 
-(defun ytr-guess-or-query-shortcode-and-comment-id ()
+(defun ytr-guess-or-read-shortcode-and-comment-id ()
   "Guess shortcode on context or start a query."
   (let ((guess (ytr-guess-shortcode-and-comment-id)))
-    (if guess guess (cons (ytr-query-shortcode-annotated) nil))))
+    (if guess guess (cons (ytr-read-shortcode) nil))))
 
 ;;;; history
 (defun ytr-retrieve-history-issues-alist ()
@@ -443,7 +481,7 @@
         (t (org-narrow-to-subtree)))
   (goto-char (point-min))
   (let ((wconf (current-window-configuration))
-        (issue-id (ytr-guess-or-query-shortcode))
+        (issue-id (ytr-guess-or-read-shortcode))
         (curlevel (ytr-max-heading-level)))
     (org-gfm-export-as-markdown nil nil)
     (markdown-mode)
@@ -483,7 +521,7 @@
         (t (org-narrow-to-subtree)))
   (goto-char (point-min))
   (let* ((curlevel (ytr-max-heading-level))
-         (issue-id (ytr-guess-or-query-shortcode))
+         (issue-id (ytr-guess-or-read-shortcode))
          (new-node-id (save-window-excursion
                         (org-gfm-export-as-markdown nil nil)
                         (markdown-mode)
@@ -625,7 +663,7 @@
     )
   )
 
-(defun ytr-org (shortcode)
+(defun ytr-org-by-shortcode (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
   (ytr-issue-alist-to-org (ytr-retrieve-issue-alist shortcode) shortcode)
   (org-mode)
@@ -633,47 +671,30 @@
   (goto-char (point-min))
   )
 
-(defun ytr-query-org (shortcode)
+(defun ytr-org (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
-  (interactive (list (ytr-query-shortcode-annotated)))
+  (interactive (list (ytr-read-shortcode)))
   (ytr-add-issue-to-history shortcode)
-  (ytr-org shortcode))
+  (ytr-org-by-shortcode shortcode))
 
-(defun ytr-smart-query-org (shortcode)
+(defun ytr-smart-org (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
-  (interactive (list (ytr-guess-or-query-shortcode)))
+  (interactive (list (ytr-guess-or-read-shortcode)))
   (ytr-add-issue-to-history shortcode)
-  (ytr-org shortcode))
+  (ytr-org-by-shortcode shortcode))
 
-;;;; consult
-(defun ytr-consult-state-function (action shortcode)
-  ""
-  (cl-case action
-    ('preview (ytr-sneak-window
-               (find-if (lambda (elem) (string= (alist-get 'idReadable elem) shortcode)) issues-alist)))
-    ('exit (quit-window))))
-
-(defun ytr-consult1 (query)
-  "use consult to get the shortcode from a given query"
-  (let ((issues-alist (ytr-retrieve-query-issues-alist query))
-        (choices (mapcar (lambda (item) (alist-get 'idReadable item)) issues-alist)))
-    (consult--read choices
-                   :category 'ytr-shortcode
-                   :state 'ytr-consult-state-function
-                   :require-match t
-                   :history 'ytr-issue-history
-                   ;; :add-history (list (ytr-guess-shortcode)) ;; klappt noch nicht
-                   ;; :keymap tobedone
-                   )))
-
-(defun ytr-read-query-consult ()
-  "Use consult to get a query"
-  (consult--read ytr-queries))
+(defun ytr-org-heading-set-shortcode ()
+  "Set Property YTR_SHORTCODE on org heading and append tag YTR"
+  (interactive)
+  (org-set-property "YTR_SHORTCODE" (org-read-property-value "YTR_SHORTCODE"))
+  (let ((tags (org-get-tags)))
+    (if (member "YTR" tags) nil (org-set-tags (append (list "YTR") tags)))))
 
 ;;;; preview
 
-(defun ytr-sneak (issue-alist)
-  (let-alist issue-alist
+(defun ytr-sneak-window (issue-alist)
+  (with-output-to-temp-buffer "*ytr-describe-issue*"
+    (let-alist issue-alist
     (princ (format "%s: %s\n" .idReadable .summary))
     (princ (format "Reporter: %s, Created: %s, Resolved: %s, State: %s, Assignee: %s\n"
                    (alist-get 'login .reporter)
@@ -682,15 +703,16 @@
                    (ytr-get-customField-value issue-alist "State")
                    (ytr-get-customField-value issue-alist "Assignee")))
     (princ "------------------------\n")
-    (princ .description)))
+    (princ .description))))
 
-(defun ytr-sneak-window (issue-alist)
-  (with-output-to-temp-buffer "*ytr-describe-issue*"
-    (ytr-sneak issue-alist)))
-
-(defun ytr-smart-query-sneak (shortcode)
+(defun ytr-sneak (shortcode)
   "Display a side window with the description and same basic information on issue with SHORTCODE"
-  (interactive (list (ytr-guess-or-query-shortcode)))
+  (interactive (list (ytr-read-shortcode)))
+  (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
+
+(defun ytr-smart-sneak (shortcode)
+  "Display a side window with the description and same basic information on issue with SHORTCODE"
+  (interactive (list (ytr-guess-or-read-shortcode)))
   (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
 
 ;;;; Issue buttons
@@ -699,7 +721,7 @@
   'follow-link t
   'action #'ytr-on-shortcode-button)
 
-(defun ytr-browse (shortcode &optional comment-id)
+(defun ytr-browse-by-shortcode (shortcode &optional comment-id)
   "Open an issue in browser and focus a comment, if comment-id is given."
   (browse-url (if comment-id
                   (ytr-issue-comment-url shortcode comment-id)
@@ -707,7 +729,7 @@
 
 (defun ytr-on-shortcode-button (button)
   (let ((issue-comment-ids (ytr-parse-shortcode-and-comment-id (buffer-substring (button-start button) (button-end button)))))
-    (ytr-browse (car issue-comment-ids) (cdr issue-comment-ids))))
+    (ytr-browse-by-shortcode (car issue-comment-ids) (cdr issue-comment-ids))))
 
 (defun ytr-shortcode-buttonize-buffer ()
   "turn all issue shortcodes into buttons"
@@ -720,26 +742,19 @@
 (add-hook 'org-mode-hook 'ytr-shortcode-buttonize-buffer)
 
 ;;;; interactive
-(defun ytr-heading-set-shortcode ()
-  "Set Property YTR_SHORTCODE on headline and append tag YTR"
-  (interactive)
-  (org-set-property "YTR_SHORTCODE" (org-read-property-value "YTR_SHORTCODE"))
-  (let ((tags (org-get-tags)))
-    (if (member "YTR" tags) nil (org-set-tags (append (list "YTR") tags)))))
-
-(defun ytr-query-browse (shortcode)
+(defun ytr-browse (shortcode)
   "Open an issue in the webbrowser"
-  (interactive (list (ytr-query-shortcode-annotated)))
+  (interactive (list (ytr-read-shortcode)))
   (ytr-add-issue-to-history shortcode)
   (browse-url (ytr-issue-url shortcode)))
 
-(defun ytr-smart-query-browse (issue-comment-ids)
+(defun ytr-smart-browse (issue-comment-ids)
   "Open an issue in the webbrowser"
-  (interactive (list (ytr-guess-or-query-shortcode-and-comment-id)))
+  (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
   (ytr-add-issue-to-history (car issue-comment-ids))
-  (ytr-browse (car issue-comment-ids) (cdr issue-comment-ids)))
+  (ytr-browse-by-shortcode (car issue-comment-ids) (cdr issue-comment-ids)))
 
-(defun ytr-query-refine-browse ()
+(defun ytr-read-refine-browse ()
   "Edit a predefined query to find an issue and open it in the browser"
   (interactive)
   (let* ((query-orig (completing-read "Query: " ytr-queries nil t))
@@ -762,7 +777,7 @@
 ;;;; helm
 (if (require 'helm nil t)
     (progn
-      (defun ytr-helm-query (&optional defaultquery)
+      (defun ytr-helm (&optional defaultquery)
         "Use Helm to select an issue from a query and open it."
         (interactive)
         (let* ((query (completing-read "Query: " ytr-queries nil nil defaultquery))
@@ -784,7 +799,7 @@
                                         ("Open in org buffer" . (lambda (issue-alist)
                                                                   (let ((shortcode (alist-get 'idReadable issue-alist)))
                                                                     (ytr-add-issue-to-history shortcode)
-                                                                    (ytr-org shortcode)))))
+                                                                    (ytr-org-by-shortcode shortcode)))))
                               :must-match 'ignore
                               :persistent-action 'ytr-sneak-window
                               :keymap (let ((map (make-sparse-keymap)))
@@ -812,7 +827,7 @@
               (helm :sources (helm-build-sync-source "ytr-issues"
                                                      :candidates choices
                                                      :action '(("Open in browser" . (lambda (issue-alist) (browse-url (ytr-issue-url (alist-get 'idReadable issue-alist)))))
-                                                               ("Open in org buffer" . (lambda (issue-alist) (ytr-org (alist-get 'idReadable issue-alist)))))
+                                                               ("Open in org buffer" . (lambda (issue-alist) (ytr-org-by-shortcode (alist-get 'idReadable issue-alist)))))
                                                      :must-match 'ignore
                                                      :persistent-action 'ytr-sneak-window
                                                      :cleanup (lambda () (kill-matching-buffers "*ytr-describe-issue*" nil t))
@@ -822,5 +837,6 @@
           ))
   ))
 
+;;;; provide
 (provide 'ytr)
 ;;; ytr.el ends here
