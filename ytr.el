@@ -36,6 +36,8 @@
 
 ;;; Code:
 
+;;;; Basic
+
 (require 'ffap)
 (require 'plz)
 
@@ -53,7 +55,7 @@
 
 (defvar ytr-issue-history '() "History for issues")
 
-;; * urls and shortcodes
+;;;; urls and shortcodes
 (defun ytr-issue-url (shortcode)
   "Return the URL for a issue given by shortcode"
   (concat ytr-baseurl "/issue/" shortcode))
@@ -77,7 +79,7 @@
     (car (split-string choice ":")))
   )
 
-;; * annotation
+;;;; annotation
 (require 'marginalia)
 
 (add-to-list 'marginalia-annotator-registry '(ytr-shortcode ytr-annotate-shortcode builtin none))
@@ -173,7 +175,7 @@
   (let ((guess (ytr-guess-shortcode-and-comment-id)))
     (if guess guess (cons (ytr-query-shortcode-annotated) nil))))
 
-;; history
+;;;; history
 (defun ytr-retrieve-history-issues-alist ()
   (let ((result))
     (dolist (elt (reverse ytr-issue-history) result)
@@ -185,7 +187,7 @@
   (push shortcode ytr-issue-history)
 )
 
-;; * api
+;;;; api
 (defun ytr-plz (method request &optional body)
   "Generic plz request method"
   (let* ((response (plz method request
@@ -233,7 +235,7 @@
     (cdr (assoc 'name (assoc 'value
                              (cl-find-if (lambda (alist) (equal (cdr (assoc 'name alist)) field-name)) .customFields))))))
 
-;; * org mode conversion
+;;;; org mode conversion
 (defun ytr-md-to-org (input level)
   "Convert a markdown string to org mode using pandoc. LEVEL indicates the level of top level headings in org and defaults to 3."
   (save-current-buffer
@@ -369,7 +371,7 @@
           nil))))
   )
 
-;; * org interactive
+;;;; org interactive
 (defvar-keymap ytr-commit-new-node-mode-map "C-c C-c" #'ytr-commit-new-node)
 (defvar-keymap ytr-commit-new-node-mode-map "C-c C-k" #'ytr-cancel-commit)
 
@@ -643,7 +645,7 @@
   (ytr-add-issue-to-history shortcode)
   (ytr-org shortcode))
 
-;; * consult
+;;;; consult
 (defun ytr-consult-state-function (action shortcode)
   ""
   (cl-case action
@@ -668,7 +670,7 @@
   "Use consult to get a query"
   (consult--read ytr-queries))
 
-;; * preview
+;;;; preview
 
 (defun ytr-sneak (issue-alist)
   (let-alist issue-alist
@@ -691,7 +693,7 @@
   (interactive (list (ytr-guess-or-query-shortcode)))
   (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
 
-;; * Issue buttons
+;;;; Issue buttons
 
 (define-button-type 'shortcode-button
   'follow-link t
@@ -717,7 +719,7 @@
 
 (add-hook 'org-mode-hook 'ytr-shortcode-buttonize-buffer)
 
-;; * interactive
+;;;; interactive
 (defun ytr-heading-set-shortcode ()
   "Set Property YTR_SHORTCODE on headline and append tag YTR"
   (interactive)
@@ -757,7 +759,7 @@
   (browse-url (concat ytr-baseurl "/newIssue?description=" description "&summary=" title)))
 
 
-;; * helm
+;;;; helm
 (if (require 'helm nil t)
     (progn
       (defun ytr-helm-query (&optional defaultquery)
