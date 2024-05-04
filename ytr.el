@@ -643,6 +643,31 @@
   (ytr-add-issue-to-history shortcode)
   (ytr-org shortcode))
 
+;; * consult
+(defun ytr-consult-state-function (action shortcode)
+  ""
+  (cl-case action
+    ('preview (ytr-sneak-window
+               (find-if (lambda (elem) (string= (alist-get 'idReadable elem) shortcode)) issues-alist)))
+    ('exit (quit-window))))
+
+(defun ytr-consult1 (query)
+  "use consult to get the shortcode from a given query"
+  (let ((issues-alist (ytr-retrieve-query-issues-alist query))
+        (choices (mapcar (lambda (item) (alist-get 'idReadable item)) issues-alist)))
+    (consult--read choices
+                   :category 'ytr-shortcode
+                   :state 'ytr-consult-state-function
+                   :require-match t
+                   :history 'ytr-issue-history
+                   ;; :add-history (list (ytr-guess-shortcode)) ;; klappt noch nicht
+                   ;; :keymap tobedone
+                   )))
+
+(defun ytr-read-query-consult ()
+  "Use consult to get a query"
+  (consult--read ytr-queries))
+
 ;; * preview
 
 (defun ytr-sneak (issue-alist)
