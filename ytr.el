@@ -125,8 +125,8 @@
 
 (defun ytr-read-shortcode-from-query-consult (query)
   "use consult to get the shortcode from a given query"
-  (let ((issues-alist (ytr-retrieve-query-issues-alist query))
-        (choices (mapcar (lambda (item) (alist-get 'idReadable item)) issues-alist)))
+  (let* ((issues-alist (ytr-retrieve-query-issues-alist query))
+         (choices (mapcar (lambda (item) (alist-get 'idReadable item)) issues-alist)))
     (consult--read choices
                    :category 'ytr-shortcode
                    :state 'ytr-consult-state-function
