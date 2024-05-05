@@ -424,9 +424,11 @@
 (defun ytr-cancel-commit ()
   "Cancel committing something to youtrack"
   (interactive)
-  (set-window-configuration ytr-buffer-wconf)
-  (widen)
-  )
+  (let ((node-type ytr-buffer-node-type))
+   (set-window-configuration ytr-buffer-wconf)
+   (cl-case node-type
+     (issue (undo))))
+  (widen))
 
 (defun ytr-commit-new-comment ()
   "Commit buffer content as a new comment"
