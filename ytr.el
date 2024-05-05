@@ -51,6 +51,8 @@
 
 (defcustom ytr-plz-debug nil "Print plz debug messages if non nil" :type 'bool :group 'ytr)
 
+(defcustom ytr-use-saved-queries t "Wether to use saved queries of user defined queries" :type 'bool :group 'ytr)
+
 (defcustom ytr-make-new-comment-behavior 'link "What should be done with the region from which a comment was created? One of 'kill, 'fetch (buggy), 'link or nil." :type 'symbol :group 'ytr)
 
 (defvar ytr-issue-history '() "History for issues")
@@ -84,6 +86,7 @@
 ;;;;; marginalia
 
 (add-to-list 'marginalia-annotator-registry '(ytr-shortcode ytr-annotate-shortcode builtin none))
+(add-to-list 'marginalia-annotator-registry '(ytr-query ytr-annotate-query builtin none))
 
 (defun ytr-completing-read-categorised (prompt choices category)
   "Like completing-read but puts a category on the choices."
@@ -103,6 +106,20 @@
        ((ytr-get-customField-value issue-alist "Assignee") :format "Assignee: %s" :truncate .3 :face 'marginalia-documentation)
        ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)):truncate 16 :face 'marginalia-documentation)
        ))))
+
+(defun ytr-annotate-query (cand)
+  "Annotate queries with some info"
+  (let* ((query-alist (find-if (lambda (elem) (string= (alist-get 'query elem) cand)) queries-alist))
+         (total (alist-get 'issues query-alist))
+         (unresolved (seq-drop-while (lambda (issue) (alist-get 'resolved issue)) total))
+         (mine (seq-take-while (lambda (issue) (string= "Kapuze" (ytr-get-customField-value issue "Assignee"))) unresolved))
+         ) ;; queries-alist comes from ytr-read-shortcode-annotated via lexical binding!
+      (marginalia--fields
+       ((length total) :format "Total: %s" :truncate .3 :face 'marginalia-documentation)
+       ((length unresolved) :format "Unresolved: %s" :truncate .3 :face 'marginalia-documentation)
+       ((length mine) :format "Assigned to me: %s" :truncate .3 :face 'marginalia-documentation)
+       ;; ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)):truncate 16 :face 'marginalia-documentation)
+       )))
 
 (defun ytr-read-shortcode-annotated ()
   "Return a shortcode from a query"
@@ -142,9 +159,17 @@
   (consult--read ytr-queries
                  :history 'ytr-query-history))
 
+(defun ytr-read-query-saved-consult ()
+  "Use consult to get a query from saved queries"
+  (let* ((queries-alist (ytr-retrieve-saved-queries-alist))
+         (choices (mapcar (lambda (item) (alist-get 'query item)) queries-alist)))
+    (consult--read choices
+                   :category 'ytr-query
+                   :history 'ytr-query-history)))
+
 (defun ytr-read-shortcode-consult ()
   "Use consult to read a shortcode"
-  (ytr-read-shortcode-from-query-consult (ytr-read-query-consult)))
+  (ytr-read-shortcode-from-query-consult (if ytr-use-saved-queries (ytr-read-query-saved-consult) (ytr-read-query-consult))))
 
 ;;;;; customvar
 
@@ -250,6 +275,10 @@
 (defun ytr-retrieve-query-issues-alist (query)
   "Retrieve list of issues by query"
   (ytr-plz 'get (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,reporter,created,resolved,reporter(login),customFields(name,value(name))&query=" (url-hexify-string query))))
+
+(defun ytr-retrieve-saved-queries-alist ()
+  "Retrieve list of saved queries"
+  (ytr-plz 'get (concat ytr-baseurl "/api/savedQueries?fields=query,issues(resolved,customFields(name,value(name)))")))
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
@@ -675,7 +704,9 @@
 
 (defun ytr-org (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
-  (interactive (list (ytr-read-shortcode)))
+  (interactive (list
+                (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
+                  (ytr-read-shortcode))))
   (ytr-add-issue-to-history shortcode)
   (ytr-org-by-shortcode shortcode))
 
@@ -709,7 +740,9 @@
 
 (defun ytr-sneak (shortcode)
   "Display a side window with the description and same basic information on issue with SHORTCODE"
-  (interactive (list (ytr-read-shortcode)))
+  (interactive (list
+                (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
+                  (ytr-read-shortcode))))
   (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
 
 (defun ytr-smart-sneak (shortcode)
@@ -746,7 +779,9 @@
 ;;;; interactive
 (defun ytr-browse (shortcode)
   "Open an issue in the webbrowser"
-  (interactive (list (ytr-read-shortcode)))
+  (interactive (list
+                (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
+                  (ytr-read-shortcode))))
   (ytr-add-issue-to-history shortcode)
   (browse-url (ytr-issue-url shortcode)))
 
