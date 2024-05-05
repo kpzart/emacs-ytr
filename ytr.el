@@ -411,13 +411,11 @@
   )
 
 ;;;; org interactive
-(defvar-keymap ytr-commit-new-node-mode-map "C-c C-c" #'ytr-commit-new-node)
-(defvar-keymap ytr-commit-new-node-mode-map "C-c C-k" #'ytr-cancel-commit)
+(defvar-keymap ytr-commit-new-node-mode-map "C-c C-c" #'ytr-commit-new-node "C-c C-k" #'ytr-cancel-commit)
 
 (define-derived-mode ytr-commit-new-node-mode markdown-mode "ytr-commit-new-node-mode" "Mode for editing markdown exports from org before sending them to youtrack")
 
-(defvar-keymap ytr-commit-update-node-mode-map "C-c C-c" #'ytr-commit-update-node)
-(defvar-keymap ytr-commit-update-node-mode-map "C-c C-k" #'ytr-cancel-commit)
+(defvar-keymap ytr-commit-update-node-mode-map "C-c C-c" #'ytr-commit-new-node "C-c C-k" #'ytr-cancel-commit)
 
 (define-derived-mode ytr-commit-update-node-mode markdown-mode "ytr-commit-update-node-mode" "Mode for editing markdown exports from org before sending them to youtrack")
 
@@ -487,7 +485,6 @@
         (issue-id (ytr-guess-or-read-shortcode))
         (curlevel (ytr-max-heading-level)))
     (org-gfm-export-as-markdown nil nil)
-    (markdown-mode)
     (replace-regexp "^#" "##" nil (point-min) (point-max))
     (ytr-commit-new-node-mode)
     (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
@@ -507,7 +504,6 @@
   (let ((wconf (current-window-configuration))
         (curlevel (ytr-max-heading-level)))
     (org-gfm-export-as-markdown nil nil)
-    (markdown-mode)
     (replace-regexp "^#" "##" nil (point-min) (point-max))
     (ytr-commit-new-node-mode)
     (message "Create new issue with title: %s. C-c to submit, C-k to cancel" title)
