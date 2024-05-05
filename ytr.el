@@ -186,6 +186,7 @@
 
 (defun ytr-guess-shortcode ()
   "Return a shortcode from current context."
+  (interactive)
   (let ((issue (ytr-shortcode-from-point)))
     (if issue issue
       (let ((issue (ytr-shortcode-from-org-property)))
@@ -659,9 +660,10 @@
          )
     ;; markiere den subtree und ersetze ihn durch das geholte, setze die properties
     (org-cut-subtree)
-    (ytr-get-insert-remote-node issue-id node-id type curlevel)
-    )
-  )
+    (condition-case err
+     (ytr-get-insert-remote-node issue-id node-id type curlevel)
+     (error (undo)
+            (signal (car err) (cdr err))))))
 
 (defun ytr-org-by-shortcode (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
