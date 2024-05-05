@@ -54,6 +54,7 @@
 (defcustom ytr-make-new-comment-behavior 'link "What should be done with the region from which a comment was created? One of 'kill, 'fetch (buggy), 'link or nil." :type 'symbol :group 'ytr)
 
 (defvar ytr-issue-history '() "History for issues")
+(defvar ytr-query-history '() "History for query")
 
 ;;;; urls
 (defun ytr-issue-url (shortcode)
@@ -138,7 +139,8 @@
 
 (defun ytr-read-query-consult ()
   "Use consult to get a query"
-  (consult--read ytr-queries))
+  (consult--read ytr-queries
+                 :history 'ytr-query-history))
 
 (defun ytr-read-shortcode-consult ()
   "Use consult to read a shortcode"
