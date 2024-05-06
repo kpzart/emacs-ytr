@@ -241,6 +241,17 @@
   (let ((guess (ytr-guess-shortcode-and-comment-id)))
     (if guess guess (cons (ytr-read-shortcode) nil))))
 
+;;;; embark
+
+(defvar-keymap embark-ytr-shortcode-actions
+  :doc "Keymap for actions for ytr shortcodes"
+  :parent embark-general-map
+  "o" #'ytr-dart-org
+  "p" #'ytr-dart-sneak
+  "w" #'ytr-dart-browse)
+
+(add-to-list 'embark-keymap-alist '(ytr-shortcode . embark-ytr-shortcode-actions))
+
 ;;;; history
 (defun ytr-retrieve-history-issues-alist ()
   (let ((result))
@@ -694,13 +705,13 @@
      (error (undo)
             (signal (car err) (cdr err))))))
 
-(defun ytr-org-by-shortcode (shortcode)
-  "Retrieve an issue and convert it to a temporary org buffer"
+(defun ytr-dart-org (shortcode)
+  "Like ytr-org but offers a simple prompt for entering the shortcode with no completions"
+  (interactive "sShortcode: ")
   (ytr-issue-alist-to-org (ytr-retrieve-issue-alist shortcode) shortcode)
   (org-mode)
   (ytr-shortcode-buttonize-buffer)
-  (goto-char (point-min))
-  )
+  (goto-char (point-min)))
 
 (defun ytr-org (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
@@ -708,13 +719,13 @@
                 (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
                   (ytr-read-shortcode))))
   (ytr-add-issue-to-history shortcode)
-  (ytr-org-by-shortcode shortcode))
+  (ytr-dart-org shortcode))
 
 (defun ytr-smart-org (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
   (interactive (list (ytr-guess-or-read-shortcode)))
   (ytr-add-issue-to-history shortcode)
-  (ytr-org-by-shortcode shortcode))
+  (ytr-dart-org shortcode))
 
 (defun ytr-org-heading-set-shortcode ()
   "Set Property YTR_SHORTCODE on org heading and append tag YTR"
@@ -738,58 +749,46 @@
     (princ "------------------------\n")
     (princ .description))))
 
+(defun ytr-dart-sneak (shortcode)
+  "Like ytr-sneak but offers a simple prompt for entering the shortcode with no completions"
+  (interactive "sShortcode: ")
+  (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
+
 (defun ytr-sneak (shortcode)
   "Display a side window with the description and same basic information on issue with SHORTCODE"
   (interactive (list
                 (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
                   (ytr-read-shortcode))))
-  (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
+  (ytr-dart-sneak shortcode))
 
 (defun ytr-smart-sneak (shortcode)
   "Display a side window with the description and same basic information on issue with SHORTCODE"
   (interactive (list (ytr-guess-or-read-shortcode)))
   (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
 
-;;;; Issue buttons
+;;;; Open in browser
 
-(define-button-type 'shortcode-button
-  'follow-link t
-  'action #'ytr-on-shortcode-button)
-
-(defun ytr-browse-by-shortcode (shortcode &optional comment-id)
-  "Open an issue in browser and focus a comment, if comment-id is given."
+(defun ytr-dart-browse (shortcode &optional comment-id)
+  "Like ytr-browser but offers a simple prompt for entering the shortcode with no completions"
+  (interactive "sShortcode: ")
   (browse-url (if comment-id
                   (ytr-issue-comment-url shortcode comment-id)
                 (ytr-issue-url shortcode))))
 
-(defun ytr-on-shortcode-button (button)
-  (let ((issue-comment-ids (ytr-parse-shortcode-and-comment-id (buffer-substring (button-start button) (button-end button)))))
-    (ytr-browse-by-shortcode (car issue-comment-ids) (cdr issue-comment-ids))))
 
-(defun ytr-shortcode-buttonize-buffer ()
-  "turn all issue shortcodes into buttons"
-  (interactive)
-  (save-excursion
-    (goto-char (point-min))
-    (while (re-search-forward "[^A-z0-9-]\\([A-z]+-[0-9]+\\(#[0-9-]+\\)?\\)[^A-z0-9-]" nil t)
-      (make-button (match-beginning 1) (match-end 1) :type 'shortcode-button))))
-
-(add-hook 'org-mode-hook 'ytr-shortcode-buttonize-buffer)
-
-;;;; interactive
 (defun ytr-browse (shortcode)
   "Open an issue in the webbrowser"
   (interactive (list
                 (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
                   (ytr-read-shortcode))))
   (ytr-add-issue-to-history shortcode)
-  (browse-url (ytr-issue-url shortcode)))
+  (ytr-dart-browse))
 
 (defun ytr-smart-browse (issue-comment-ids)
   "Open an issue in the webbrowser"
   (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
   (ytr-add-issue-to-history (car issue-comment-ids))
-  (ytr-browse-by-shortcode (car issue-comment-ids) (cdr issue-comment-ids)))
+  (ytr-dart-browse (car issue-comment-ids) (cdr issue-comment-ids)))
 
 (defun ytr-read-refine-browse ()
   "Edit a predefined query to find an issue and open it in the browser"
@@ -810,6 +809,25 @@
   "Open web browser to create a new issue"
   (browse-url (concat ytr-baseurl "/newIssue?description=" description "&summary=" title)))
 
+;;;; Issue buttons
+
+(define-button-type 'shortcode-button
+  'follow-link t
+  'action #'ytr-on-shortcode-button)
+
+(defun ytr-on-shortcode-button (button)
+  (let ((issue-comment-ids (ytr-parse-shortcode-and-comment-id (buffer-substring (button-start button) (button-end button)))))
+    (ytr-dart-browse (car issue-comment-ids) (cdr issue-comment-ids))))
+
+(defun ytr-shortcode-buttonize-buffer ()
+  "turn all issue shortcodes into buttons"
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward "[^A-z0-9-]\\([A-z]+-[0-9]+\\(#[0-9-]+\\)?\\)[^A-z0-9-]" nil t)
+      (make-button (match-beginning 1) (match-end 1) :type 'shortcode-button))))
+
+(add-hook 'org-mode-hook 'ytr-shortcode-buttonize-buffer)
 
 ;;;; helm
 (if (require 'helm nil t)
@@ -836,7 +854,7 @@
                                         ("Open in org buffer" . (lambda (issue-alist)
                                                                   (let ((shortcode (alist-get 'idReadable issue-alist)))
                                                                     (ytr-add-issue-to-history shortcode)
-                                                                    (ytr-org-by-shortcode shortcode)))))
+                                                                    (ytr-dart-org shortcode)))))
                               :must-match 'ignore
                               :persistent-action 'ytr-sneak-window
                               :keymap (let ((map (make-sparse-keymap)))
@@ -864,7 +882,7 @@
               (helm :sources (helm-build-sync-source "ytr-issues"
                                                      :candidates choices
                                                      :action '(("Open in browser" . (lambda (issue-alist) (browse-url (ytr-issue-url (alist-get 'idReadable issue-alist)))))
-                                                               ("Open in org buffer" . (lambda (issue-alist) (ytr-org-by-shortcode (alist-get 'idReadable issue-alist)))))
+                                                               ("Open in org buffer" . (lambda (issue-alist) (ytr-dart-org (alist-get 'idReadable issue-alist)))))
                                                      :must-match 'ignore
                                                      :persistent-action 'ytr-sneak-window
                                                      :cleanup (lambda () (kill-matching-buffers "*ytr-describe-issue*" nil t))
