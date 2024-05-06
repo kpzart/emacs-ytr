@@ -252,6 +252,20 @@
 
 (add-to-list 'embark-keymap-alist '(ytr-shortcode . embark-ytr-shortcode-actions))
 
+(defun ytr-embark-shortcode-target-finder ()
+  "Find Shortcodes for embark"
+  (save-excursion
+    (let* ((start (progn (skip-chars-backward "[:alnum:]-#") (point)))
+           (end (progn (skip-chars-forward "[:alnum:]-#") (point)))
+           (str (buffer-substring-no-properties start end)))
+      (save-match-data
+        (when (string-match-p "^[A-z]+-[0-9]+$" str)
+          `(ytr-shortcode
+            ,str
+            ,start . ,end))))))
+
+(add-to-list 'embark-target-finders 'ytr-embark-shortcode-target-finder)
+
 ;;;; history
 (defun ytr-retrieve-history-issues-alist ()
   (let ((result))
