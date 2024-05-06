@@ -182,7 +182,7 @@
 ;;;; recognize shortcode
 (add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9A-z-#" "" ""))
 
-(defun ytr-parse-shortcode-and-comment-id (candidate)
+(defun ytr-parse-shortcode-and-node-id (candidate)
   "Parse string for and issue shortcode and a comment id if present"
   (if (string-match "^\\([A-z]+-[0-9]+\\)\\(#\\([0-9-]+\\)\\)?$" candidate)
       (cons (match-string 1 candidate) (match-string 3 candidate))
@@ -190,7 +190,7 @@
 
 (defun ytr-shortcode-and-comment-id-from-point ()
   "Return a cons with the shortcode and optioinal the item id at point or nil if there is none"
-  (ytr-parse-shortcode-and-comment-id (ffap-string-at-point 'ytr)))
+  (ytr-parse-shortcode-and-node-id (ffap-string-at-point 'ytr)))
 
 (defun ytr-shortcode-from-point ()
   "Return the shortcode at point or nil if there is none"
@@ -242,6 +242,7 @@
     (if guess guess (cons (ytr-read-shortcode) nil))))
 
 ;;;; embark
+(require 'embark)
 
 (defvar-keymap embark-ytr-shortcode-actions
   :doc "Keymap for actions for ytr shortcodes"
@@ -719,13 +720,15 @@
      (error (undo)
             (signal (car err) (cdr err))))))
 
-(defun ytr-dart-org (shortcode)
-  "Like ytr-org but offers a simple prompt for entering the shortcode with no completions"
+(defun ytr-dart-org (shortcode-node)
+  "Like ytr-org but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
   (interactive "sShortcode: ")
-  (ytr-issue-alist-to-org (ytr-retrieve-issue-alist shortcode) shortcode)
-  (org-mode)
-  (ytr-shortcode-buttonize-buffer)
-  (goto-char (point-min)))
+  (let* ((issue-node-ids (ytr-parse-shortcode-and-node-id shortcode-node))
+         (shortcode (car issue-node-ids)))
+    (ytr-issue-alist-to-org (ytr-retrieve-issue-alist shortcode) shortcode)
+    (org-mode)
+    (ytr-shortcode-buttonize-buffer)
+    (goto-char (point-min))))
 
 (defun ytr-org (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
@@ -763,10 +766,12 @@
     (princ "------------------------\n")
     (princ .description))))
 
-(defun ytr-dart-sneak (shortcode)
-  "Like ytr-sneak but offers a simple prompt for entering the shortcode with no completions"
+(defun ytr-dart-sneak (shortcode-node)
+  "Like ytr-sneak but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
   (interactive "sShortcode: ")
-  (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
+  (let* ((issue-node-ids (ytr-parse-shortcode-and-node-id shortcode-node))
+         (shortcode (car issue-node-ids)))
+    (ytr-sneak-window (ytr-retrieve-issue-alist shortcode))))
 
 (defun ytr-sneak (shortcode)
   "Display a side window with the description and same basic information on issue with SHORTCODE"
@@ -782,13 +787,18 @@
 
 ;;;; Open in browser
 
-(defun ytr-dart-browse (shortcode &optional comment-id)
-  "Like ytr-browser but offers a simple prompt for entering the shortcode with no completions"
-  (interactive "sShortcode: ")
-  (browse-url (if comment-id
-                  (ytr-issue-comment-url shortcode comment-id)
-                (ytr-issue-url shortcode))))
+(defun ytr-browse1 (issue-node-ids)
+  ""
+  (let* ((shortcode (car issue-node-ids))
+         (comment-id (cdr issue-node-ids)))
+    (browse-url (if comment-id
+                    (ytr-issue-comment-url shortcode comment-id)
+                  (ytr-issue-url shortcode)))))
 
+(defun ytr-dart-browse (shortcode-node)
+  "Like ytr-browser but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
+  (interactive "sShortcode: ")
+  (ytr-browse1 (ytr-parse-shortcode-and-node-id shortcode-node)))
 
 (defun ytr-browse (shortcode)
   "Open an issue in the webbrowser"
@@ -802,7 +812,7 @@
   "Open an issue in the webbrowser"
   (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
   (ytr-add-issue-to-history (car issue-comment-ids))
-  (ytr-dart-browse (car issue-comment-ids) (cdr issue-comment-ids)))
+  (ytr-browse1 issue-comment-ids))
 
 (defun ytr-read-refine-browse ()
   "Edit a predefined query to find an issue and open it in the browser"
@@ -830,7 +840,7 @@
   'action #'ytr-on-shortcode-button)
 
 (defun ytr-on-shortcode-button (button)
-  (let ((issue-comment-ids (ytr-parse-shortcode-and-comment-id (buffer-substring (button-start button) (button-end button)))))
+  (let ((issue-comment-ids (ytr-parse-shortcode-and-node-id (buffer-substring (button-start button) (button-end button)))))
     (ytr-dart-browse (car issue-comment-ids) (cdr issue-comment-ids))))
 
 (defun ytr-shortcode-buttonize-buffer ()
