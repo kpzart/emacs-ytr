@@ -110,14 +110,16 @@
 (defun ytr-annotate-query (cand)
   "Annotate queries with some info"
   (let* ((query-alist (find-if (lambda (elem) (string= (alist-get 'query elem) cand)) queries-alist))
+         (name (alist-get 'name query-alist))
          (total (alist-get 'issues query-alist))
          (unresolved (seq-drop-while (lambda (issue) (alist-get 'resolved issue)) total))
          (mine (seq-take-while (lambda (issue) (string= "Kapuze" (ytr-get-customField-value issue "Assignee"))) unresolved))
          ) ;; queries-alist comes from ytr-read-shortcode-annotated via lexical binding!
       (marginalia--fields
-       ((length total) :format "Total: %s" :truncate .3 :face 'marginalia-documentation)
-       ((length unresolved) :format "Unresolved: %s" :truncate .3 :face 'marginalia-documentation)
-       ((length mine) :format "Assigned to me: %s" :truncate .3 :face 'marginalia-documentation)
+       (name :truncate .5 :face 'marginalia-documentation)
+       ((length total) :format "Total: %s" :truncate .2 :face 'marginalia-type)
+       ((length unresolved) :format "Open: %s" :truncate .2 :face 'marginalia-type)
+       ((length mine) :format "Mine: %s" :truncate .2 :face 'marginalia-type)
        ;; ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)):truncate 16 :face 'marginalia-documentation)
        )))
 
@@ -304,7 +306,7 @@
 
 (defun ytr-retrieve-saved-queries-alist ()
   "Retrieve list of saved queries"
-  (ytr-plz 'get (concat ytr-baseurl "/api/savedQueries?fields=query,issues(resolved,customFields(name,value(name)))")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/savedQueries?fields=name,query,issues(resolved,customFields(name,value(name)))")))
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
