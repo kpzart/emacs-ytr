@@ -47,6 +47,8 @@
 
 (defcustom ytr-access-token "" "Your access token. Maybe a string or function" :type '(choice function string) :group 'ytr)
 
+(defcustom ytr-user-login "" "Your login name, used to identify your issues" :type 'string :group 'ytr)
+
 (defcustom ytr-queries () "Define your Queries here" :type '(repeat string) :group 'ytr)
 
 (defcustom ytr-plz-debug nil "Print plz debug messages if non nil" :type 'bool :group 'ytr)
@@ -113,7 +115,7 @@
          (name (alist-get 'name query-alist))
          (total (alist-get 'issues query-alist))
          (unresolved (seq-drop-while (lambda (issue) (alist-get 'resolved issue)) total))
-         (mine (seq-take-while (lambda (issue) (string= "Kapuze" (ytr-get-customField-value issue "Assignee"))) unresolved))
+         (mine (seq-take-while (lambda (issue) (string= ytr-user-login (ytr-get-customField-value issue "Assignee"))) unresolved))
          ) ;; queries-alist comes from ytr-read-shortcode-annotated via lexical binding!
       (marginalia--fields
        (name :truncate .5 :face 'marginalia-documentation)
