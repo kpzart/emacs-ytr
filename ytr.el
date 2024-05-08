@@ -82,8 +82,7 @@
                             (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
                           issues-alist))
          (choice (completing-read "Issue: " choices)))
-    (car (split-string choice ":")))
-  )
+    (car (split-string choice ":"))))
 
 ;;;;; marginalia
 
@@ -100,10 +99,12 @@
 
 (defun ytr-annotate-shortcode (cand)
   "Annotate issue shortcode with some info"
-  (let ((issue-alist (find-if (lambda (elem) (string= (alist-get 'idReadable elem) cand)) issues-alist))) ;; issues-alist comes from ytr-read-shortcode-annotated via lexical binding!
+  (let ((issue-alist (find-if (lambda (elem)
+                                (string= (alist-get 'idReadable elem) (car (split-string cand ":"))))
+                              issues-alist))) ;; issues-alist comes from ytr-read-shortcode-annotated via lexical binding!
     (let-alist issue-alist
       (marginalia--fields
-       (:left .summary :format " %s" :face 'marginalia-type)
+       ;; (:left .summary :format " %s" :face 'marginalia-type)
        ((ytr-get-customField-value issue-alist "State") :format "State: %s" :truncate .3 :face 'marginalia-documentation)
        ((ytr-get-customField-value issue-alist "Assignee") :format "Assignee: %s" :truncate .3 :face 'marginalia-documentation)
        ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)):truncate 16 :face 'marginalia-documentation)
@@ -122,7 +123,6 @@
        ((length total) :format "Total: %s" :truncate .2 :face 'marginalia-type)
        ((length unresolved) :format "Open: %s" :truncate .2 :face 'marginalia-type)
        ((length mine) :format "Mine: %s" :truncate .2 :face 'marginalia-type)
-       ;; ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)):truncate 16 :face 'marginalia-documentation)
        )))
 
 (defun ytr-read-shortcode-annotated ()
@@ -138,25 +138,28 @@
           (user-error "Query returned empty results."))))))
 
 ;;;;; consult
-(defun ytr-consult-state-function (action shortcode)
+(defun ytr-consult-state-function (action cand)
   ""
   (cl-case action
     (preview (ytr-sneak-window
-               (find-if (lambda (elem) (string= (alist-get 'idReadable elem) shortcode)) issues-alist)))
+               (find-if (lambda (elem) (string= (alist-get 'idReadable elem) (car (split-string cand ":")))) issues-alist)))
     (exit (quit-window))))
 
 (defun ytr-read-shortcode-from-query-consult (query)
   "use consult to get the shortcode from a given query"
   (let* ((issues-alist (ytr-retrieve-query-issues-alist query))
-         (choices (mapcar (lambda (item) (alist-get 'idReadable item)) issues-alist)))
-    (consult--read choices
-                   :category 'ytr-shortcode
-                   :state 'ytr-consult-state-function
-                   :require-match t
-                   :history 'ytr-issue-history
-                   ;; :add-history (list (ytr-guess-shortcode)) ;; klappt noch nicht
-                   ;; :keymap tobedone
-                   )))
+         (choices (mapcar (lambda (item)
+                            (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
+                          issues-alist)))
+    (car (split-string (consult--read choices
+                                      :category 'ytr-shortcode
+                                      :state 'ytr-consult-state-function
+                                      :require-match t
+                                      :history 'ytr-issue-history
+                                      ;; :add-history (list (ytr-guess-shortcode)) ;; klappt noch nicht
+                                      ;; :keymap tobedone
+                                      )
+                       ":"))))
 
 (defun ytr-read-query-consult ()
   "Use consult to get a query"
@@ -251,9 +254,9 @@
 (defvar-keymap embark-ytr-shortcode-actions
   :doc "Keymap for actions for ytr shortcodes"
   :parent embark-general-map
-  "o" #'ytr-dart-org
-  "p" #'ytr-dart-sneak
-  "w" #'ytr-dart-browse)
+  "o" #'ytr-embark-org
+  "p" #'ytr-embark-sneak
+  "w" #'ytr-embark-browse)
 
 (add-to-list 'embark-keymap-alist '(ytr-shortcode . embark-ytr-shortcode-actions))
 
@@ -734,6 +737,10 @@
     (ytr-shortcode-buttonize-buffer)
     (goto-char (point-min))))
 
+(defun ytr-embark-org (cand)
+  "Like ytr-dart-org but cand consists of shortcode and summary"
+  (ytr-dart-org (car (split-string cand ":"))))
+
 (defun ytr-org (shortcode)
   "Retrieve an issue and convert it to a temporary org buffer"
   (interactive (list
@@ -777,6 +784,10 @@
          (shortcode (car issue-node-ids)))
     (ytr-sneak-window (ytr-retrieve-issue-alist shortcode))))
 
+(defun ytr-embark-sneak (cand)
+  "Like ytr-dart-sneak but cand consists of shortcode and summary"
+  (ytr-dart-sneak (car (split-string cand ":"))))
+
 (defun ytr-sneak (shortcode)
   "Display a side window with the description and same basic information on issue with SHORTCODE"
   (interactive (list
@@ -804,6 +815,9 @@
   (interactive "sShortcode: ")
   (ytr-browse1 (ytr-parse-shortcode-and-node-id shortcode-node)))
 
+(defun ytr-embark-browse (cand)
+  "Like ytr-dart-browse but cand consists of shortcode and summary"
+  (ytr-dart-browse (car (split-string cand ":"))))
 (defun ytr-browse (shortcode)
   "Open an issue in the webbrowser"
   (interactive (list
