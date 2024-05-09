@@ -479,7 +479,7 @@
 
 (define-derived-mode ytr-commit-new-node-mode markdown-mode "ytr-commit-new-node-mode" "Mode for editing markdown exports from org before sending them to youtrack")
 
-(defvar-keymap ytr-commit-update-node-mode-map "C-c C-c" #'ytr-commit-new-node "C-c C-k" #'ytr-cancel-commit)
+(defvar-keymap ytr-commit-update-node-mode-map "C-c C-c" #'ytr-commit-update-node "C-c C-k" #'ytr-cancel-commit)
 
 (define-derived-mode ytr-commit-update-node-mode markdown-mode "ytr-commit-update-node-mode" "Mode for editing markdown exports from org before sending them to youtrack")
 
@@ -627,21 +627,20 @@
                     (comment (alist-get 'text (ytr-retrieve-issue-comment-alist issue-id node-id)))))
          (remote-hash (if content (sha1 content) ""))
          (local-hash (org-entry-get (point) "YTR_CONTENT_HASH" t))
-         (wconf (current-window-configuration))
-         )
+         (wconf (current-window-configuration)))
     (ytr-add-issue-to-history issue-id)
     (when (not (string= local-hash remote-hash))
         (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
 
     (org-gfm-export-as-markdown nil t)
     (replace-regexp "^#" "##" nil (point-min) (point-max))
+    (ytr-commit-update-node-mode)
+    (message "Update %s with ID %s on issue %s" type node-id issue-id)
     (setq-local ytr-buffer-wconf wconf
                 ytr-buffer-commit-type 'update
                 ytr-buffer-node-type type
                 ytr-buffer-issue-id issue-id
-                ytr-buffer-node-id node-id)
-    (ytr-commit-update-node-mode)
-    (message "Update %s with ID %s on issue %s" type node-id issue-id)))
+                ytr-buffer-node-id node-id)))
 
 (defun ytr-update-remote-node ()
   "Update a node on remote side after editing locally"
