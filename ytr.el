@@ -163,8 +163,8 @@
                                       )
                        ":"))))
 
-(defun ytr-read-query-consult ()
-  "Use consult to get a query"
+(defun ytr-read-query-var-consult ()
+  "Use consult to get a query from custom var"
   (consult--read ytr-queries
                  :history 'ytr-query-history))
 
@@ -176,9 +176,13 @@
                    :category 'ytr-query
                    :history 'ytr-query-history)))
 
+(defun ytr-read-query-consult ()
+  "Use consult to read a query"
+  (if ytr-use-saved-queries (ytr-read-query-saved-consult) (ytr-read-query-var-consult)))
+
 (defun ytr-read-shortcode-consult ()
   "Use consult to read a shortcode"
-  (ytr-read-shortcode-from-query-consult (if ytr-use-saved-queries (ytr-read-query-saved-consult) (ytr-read-query-consult))))
+  (ytr-read-shortcode-from-query-consult (if ytr-use-saved-queries (ytr-read-query-saved-consult) (ytr-read-query-var-consult))))
 
 ;;;;; customvar
 
@@ -261,6 +265,13 @@
   "w" #'ytr-embark-browse)
 
 (add-to-list 'embark-keymap-alist '(ytr-shortcode . embark-ytr-shortcode-actions))
+
+(defvar-keymap embark-ytr-query-actions
+  :doc "Keymap for actions for ytr queries"
+  :parent embark-general-map
+  "w" #'ytr-browse-query)
+
+(add-to-list 'embark-keymap-alist '(ytr-query . embark-ytr-query-actions))
 
 (defun ytr-embark-shortcode-target-finder ()
   "Find Shortcodes for embark"
@@ -853,6 +864,13 @@
 (defun ytr-browse-new-issue (title description)
   "Open web browser to create a new issue"
   (browse-url (concat ytr-baseurl "/newIssue?description=" description "&summary=" title)))
+
+(defun ytr-browse-query (query)
+  "Open web browser to execute a query"
+  (interactive (list
+                (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
+                  (ytr-read-query-consult))))
+  (browse-url (concat ytr-baseurl "/issues?q=" query)))
 
 ;;;; Issue buttons
 
