@@ -105,9 +105,11 @@
     (let-alist issue-alist
       (marginalia--fields
        ;; (:left .summary :format " %s" :face 'marginalia-type)
-       ((ytr-get-customField-value issue-alist "State") :format "State: %s" :truncate .3 :face 'marginalia-documentation)
-       ((ytr-get-customField-value issue-alist "Assignee") :format "Assignee: %s" :truncate .3 :face 'marginalia-documentation)
-       ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)):truncate 16 :face 'marginalia-documentation)
+       ((ytr-get-customField-value issue-alist "Priority") :format "P: %s" :truncate .2 :face 'marginalia-documentation)
+       ((ytr-get-customField-value issue-alist "State") :format "S: %s" :truncate .2 :face 'marginalia-documentation)
+       ((ytr-get-customField-value issue-alist "Assignee") :format "A: %s" :truncate .2 :face 'marginalia-documentation)
+       ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)) :format "c: %s" :truncate 20 :face 'marginalia-documentation)
+       ((format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) :format "u: %s" :truncate 20 :face 'marginalia-documentation)
        ))))
 
 (defun ytr-annotate-query (cand)
@@ -307,7 +309,7 @@
 
 (defun ytr-retrieve-query-issues-alist (query)
   "Retrieve list of issues by query"
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,reporter,created,resolved,reporter(login),customFields(name,value(name))&query=" (url-hexify-string query))))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,created,updated,resolved,reporter(login,fullName),customFields(name,value(name))&query=" (url-hexify-string query))))
 
 (defun ytr-retrieve-saved-queries-alist ()
   "Retrieve list of saved queries"
@@ -315,11 +317,11 @@
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login)),created,resolved,reporter(login),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name))")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login,fullName)),created,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name))")))
 
 (defun ytr-retrieve-issue-comment-alist (issue-id comment-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,author(login)")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,author(login,fullName)")))
 
 (defun ytr-send-new-comment-alist (issue-id alist)
   "Send the information in ALIST as a new comment for ticket with id ISSUE-ID"
@@ -390,10 +392,10 @@
       ;; do the comments
       (mapcar (lambda (comment-alist)
                 (let-alist comment-alist
-                  (ytr-org-insert-node .text 2 'comment shortcode .id (alist-get 'login .author) .created)))
+                  (ytr-org-insert-node .text 2 'comment shortcode .id (alist-get 'fullName .author) .created)))
               .comments)
       ;; do the description
-      (ytr-org-insert-node .description 2 'description shortcode .id (alist-get 'login .reporter) .created)
+      (ytr-org-insert-node .description 2 'description shortcode .id (alist-get 'fullName .reporter) .created)
       ;; postprocess
       (org-unindent-buffer)
       (switch-to-buffer bufname))))
@@ -694,7 +696,7 @@
            (ytr-retrieve-issue-comment-alist issue-id node-id))
          )
         (created (alist-get 'created node-alist))
-        (author (alist-get 'login
+        (author (alist-get 'fullName
                            (if (eq type 'description)
                                (alist-get 'reporter node-alist)
                              (alist-get 'author node-alist))))
@@ -767,10 +769,12 @@
   (with-output-to-temp-buffer "*ytr-describe-issue*"
     (let-alist issue-alist
     (princ (format "%s: %s\n" .idReadable .summary))
-    (princ (format "Reporter: %s, Created: %s, Resolved: %s, State: %s, Assignee: %s\n"
-                   (alist-get 'login .reporter)
+    (princ (format "Reporter: %s, created: %s, updated: %s, Resolved: %s, Priority: %s, State: %s, Assignee: %s\n"
+                   (alist-get 'fullName .reporter)
                    (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000))
+                   (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000))
                    (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-")
+                   (ytr-get-customField-value issue-alist "Priority")
                    (ytr-get-customField-value issue-alist "State")
                    (ytr-get-customField-value issue-alist "Assignee")))
     (princ "------------------------\n")
