@@ -103,7 +103,7 @@
 
 (defun ytr-annotate-shortcode (cand)
   "Annotate issue shortcode with some info"
-  (let ((issue-alist (find-if (lambda (elem)
+  (let ((issue-alist (cl-find-if (lambda (elem)
                                 (string= (alist-get 'idReadable elem) (car (split-string cand ":"))))
                               issues-alist))) ;; issues-alist comes from ytr-read-shortcode-annotated via lexical binding!
     (let-alist issue-alist
@@ -118,7 +118,7 @@
 
 (defun ytr-annotate-query (cand)
   "Annotate queries with some info"
-  (let* ((query-alist (find-if (lambda (elem) (string= (alist-get 'query elem) cand)) queries-alist))
+  (let* ((query-alist (cl-find-if (lambda (elem) (string= (alist-get 'query elem) cand)) queries-alist))
          (name (alist-get 'name query-alist))
          (total (alist-get 'issues query-alist))
          (unresolved (seq-drop-while (lambda (issue) (alist-get 'resolved issue)) total))
@@ -148,7 +148,7 @@
   ""
   (cl-case action
     (preview (ytr-sneak-window
-               (find-if (lambda (elem) (string= (alist-get 'idReadable elem) (car (split-string cand ":")))) issues-alist)))
+               (cl-find-if (lambda (elem) (string= (alist-get 'idReadable elem) (car (split-string cand ":")))) issues-alist)))
     (exit (quit-window))))
 
 (defun ytr-read-shortcode-from-query-consult (query)
