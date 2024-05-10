@@ -264,6 +264,7 @@
   :parent embark-general-map
   "o" #'ytr-embark-org
   "p" #'ytr-embark-sneak
+  "y" #'ytr-embark-copy-url
   "w" #'ytr-embark-browse)
 
 (add-to-list 'embark-keymap-alist '(ytr-shortcode . embark-ytr-shortcode-actions))
@@ -811,15 +812,50 @@
   (interactive (list (ytr-guess-or-read-shortcode)))
   (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
 
+;;;; Copy URL
+
+(defun ytr-url (issue-node-ids)
+  "Get the url for issue with comment id"
+  (let* ((shortcode (car issue-node-ids))
+         (comment-id (cdr issue-node-ids)))
+    (if comment-id
+      (ytr-issue-comment-url shortcode comment-id)
+    (ytr-issue-url shortcode))))
+
+(defun ytr-copy-url1 (issue-node-ids)
+  ""
+  (let ((url (ytr-url issue-node-ids)))
+    (message url)
+    (kill-new url)))
+
+(defun ytr-dart-copy-url (shortcode-node)
+  "Like ytr-copy-url but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
+  (interactive "sShortcode: ")
+  (ytr-copy-url1 (ytr-parse-shortcode-and-node-id shortcode-node)))
+
+(defun ytr-embark-copy-url (cand)
+  "Like ytr-dart-copy-url but cand consists of shortcode and summary"
+  (ytr-dart-copy-url (car (split-string cand ":"))))
+
+(defun ytr-copy-url (shortcode)
+  "Copy the url to an issue to kill ring"
+  (interactive (list
+                (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
+                  (ytr-read-shortcode))))
+  (ytr-add-issue-to-history shortcode)
+  (ytr-dart-copy-url shortcode))
+
+(defun ytr-smart-copy-url (issue-comment-ids)
+  "Open an issue in the webbrowser"
+  (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
+  (ytr-add-issue-to-history (car issue-comment-ids))
+  (ytr-copy-url1 issue-comment-ids))
+
 ;;;; Open in browser
 
 (defun ytr-browse1 (issue-node-ids)
   ""
-  (let* ((shortcode (car issue-node-ids))
-         (comment-id (cdr issue-node-ids)))
-    (browse-url (if comment-id
-                    (ytr-issue-comment-url shortcode comment-id)
-                  (ytr-issue-url shortcode)))))
+  (browse-url (ytr-url issue-node-ids)))
 
 (defun ytr-dart-browse (shortcode-node)
   "Like ytr-browser but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
@@ -829,13 +865,14 @@
 (defun ytr-embark-browse (cand)
   "Like ytr-dart-browse but cand consists of shortcode and summary"
   (ytr-dart-browse (car (split-string cand ":"))))
+
 (defun ytr-browse (shortcode)
   "Open an issue in the webbrowser"
   (interactive (list
                 (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
                   (ytr-read-shortcode))))
   (ytr-add-issue-to-history shortcode)
-  (ytr-dart-browse))
+  (ytr-dart-browse shortcode))
 
 (defun ytr-smart-browse (issue-comment-ids)
   "Open an issue in the webbrowser"
