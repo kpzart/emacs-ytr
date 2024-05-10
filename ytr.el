@@ -363,16 +363,15 @@
     (shell-command-on-region (point-min) (point-max)
                              (format "pandoc -f gfm -t org")
                              nil t "*ytr-convert-error*")
-    (replace-string "☒" "[X]" t (point-min) (point-max))
-    (replace-string "☐" "[ ]" t (point-min) (point-max))
+    (let ((inhibit-message t))
+      (replace-string "☒" "[X]" t (point-min) (point-max))
+     (replace-string "☐" "[ ]" t (point-min) (point-max)))
     (goto-char (point-min))
     (flush-lines " *:[A-Z_]+:.*$")
     (org-mode)
     (ytr-demote-org-headings (or level 3))
     (org-unindent-buffer)
-    (buffer-string)
-    )
-)
+    (buffer-string)))
 
 (defun ytr-issue-alist-to-org (input shortcode)
   "Convert an alist of markdown code into an org buffer with proper headings"
@@ -457,14 +456,13 @@
       (concat (capitalize first-char) rest-str))))
 
 (defun ytr-org-insert-node (content level type issue-id node-id author created)
-  "Insert a comment node at point, level is that of the node, type is generic, author is a string, created is a long value"
+  "Insert a node at point, level is that of the node, type is generic, author is a string, created is a long value"
   (let ((curpoint (point)))
     (insert (format "%s %s %s by %s\n\n"
                     (make-string level ?*)
                     (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
                     (ytr-capitalize-first-char (format "%s" type))
-                    author
-                    ))
+                    author))
     (previous-line)
     (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
     (org-set-property "YTR_ID" node-id)
@@ -473,10 +471,7 @@
     (when content (insert (ytr-md-to-org content (+ 1 level))))
     (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
       (org-set-property "YTR_SHORTCODE" issue-id))
-    (goto-char curpoint)
-
-    )
-  )
+    (goto-char curpoint)))
 
 (defun ytr-find-node ()
   "Find the parent heading with a YTR_TYPE property, sets the point and returns the type. If property is not found in buffer returns nil."
@@ -549,8 +544,8 @@
     (description (ytr-send-issue-alist ytr-buffer-issue-id `((description . ,(buffer-string)))))
     (comment (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
     (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
-  (message "Node successfully updated")
   (set-window-configuration ytr-buffer-wconf)
+  (message "Node successfully updated")
   (ytr-fetch-remote-node))
 
 
@@ -606,9 +601,7 @@
                         (let ((inhibit-message t))
                           (replace-regexp "^#" "##" nil (point-min) (point-max)))
                         (when (y-or-n-p (format "Create new comment for ticket %s from this content?" issue-id))
-                          (alist-get 'id (ytr-send-new-comment-alist issue-id `((text . ,(buffer-string)))))
-                          )
-                        )))
+                          (alist-get 'id (ytr-send-new-comment-alist issue-id `((text . ,(buffer-string)))))))))
     (ytr-add-issue-to-history issue-id)
     (cond (new-node-id
            (message "New comment created on %s with node id %s." issue-id new-node-id)
@@ -687,10 +680,8 @@
               (if (eq type 'description)
                   (ytr-send-issue-alist issue-id `((description . ,(buffer-string))))
                 (ytr-send-issue-comment-alist issue-id node-id `((text . ,(buffer-string)))))
-              (message "Node successfully updated"))
-            )
-        (ytr-fetch-remote-node)))
-  )
+              (message "Node successfully updated")))
+        (ytr-fetch-remote-node))))
 
 (defun ytr-send-node ()
   "Create a new comment or update the node, depending on context."
@@ -702,24 +693,20 @@
 
 (defun ytr-get-insert-remote-node (issue-id node-id type level)
   "Insert a remote node in org format"
-  (let* (
-        (node-alist
-         (if (eq type 'description)
-             (ytr-retrieve-issue-alist issue-id)
-           (ytr-retrieve-issue-comment-alist issue-id node-id))
-         )
-        (created (alist-get 'created node-alist))
-        (author (alist-get 'fullName
-                           (if (eq type 'description)
-                               (alist-get 'reporter node-alist)
-                             (alist-get 'author node-alist))))
-        (content
-         (if (eq type 'description)
-             (alist-get 'description node-alist)
-           (alist-get 'text node-alist)))
-        )
-    (ytr-org-insert-node content level type issue-id node-id author created))
-  )
+  (let* ((node-alist
+          (if (eq type 'description)
+              (ytr-retrieve-issue-alist issue-id)
+            (ytr-retrieve-issue-comment-alist issue-id node-id)))
+         (created (alist-get 'created node-alist))
+         (author (alist-get 'fullName
+                            (if (eq type 'description)
+                                (alist-get 'reporter node-alist)
+                              (alist-get 'author node-alist))))
+         (content
+          (if (eq type 'description)
+              (alist-get 'description node-alist)
+            (alist-get 'text node-alist))))
+    (ytr-org-insert-node content level type issue-id node-id author created)))
 
 (defun ytr-fetch-remote-node ()
   "Update a local node withs its remote content"
@@ -732,10 +719,9 @@
                    (user-error "Cannot fetch node of type %s" type-str))))
          (issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
          (node-id (org-entry-get (point) "YTR_ID" t))
-         (curlevel (org-current-level))
-         )
-    ;; markiere den subtree und ersetze ihn durch das geholte, setze die properties
-    (org-cut-subtree)
+         (curlevel (org-current-level)))
+    (let ((inhibit-message t))
+      (org-cut-subtree))
     (condition-case err
      (ytr-get-insert-remote-node issue-id node-id type curlevel)
      (error (undo)
