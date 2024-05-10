@@ -40,6 +40,10 @@
 
 (require 'ffap)
 (require 'plz)
+(require 'embark)
+(require 'consult)
+(require 'marginalia)
+
 
 (defgroup ytr nil "Youtrack integration into emacs")
 
@@ -255,8 +259,6 @@
     (if guess guess (cons (ytr-read-shortcode) nil))))
 
 ;;;; embark
-(require 'embark)
-
 (defvar-keymap embark-ytr-shortcode-actions
   :doc "Keymap for actions for ytr shortcodes"
   :parent embark-general-map
