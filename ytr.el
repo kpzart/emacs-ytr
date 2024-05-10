@@ -502,6 +502,14 @@
      (issue (undo))))
   (widen))
 
+(defun ytr-remove-all-but-heading ()
+  "Remove all line except the first, if its an org heading"
+  (goto-char (point-min))
+  (when (org-at-heading-p)
+    (forward-line)
+    (when (looking-at-p "\\s-*$") (forward-line))) ; enough for the moment, but this kills the properties
+  (kill-region (point) (point-max)))
+
 (defun ytr-commit-new-comment ()
   "Commit buffer content as a new comment"
   (setq new-node-id (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-id `((text . ,(buffer-string))))))
@@ -513,7 +521,7 @@
            (message "New comment created on %s with node id %s." issue-id new-node-id)
            (cond ((eq ytr-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
                  ((eq ytr-make-new-comment-behavior 'link)
-                  (kill-region (point-min) (point-max))
+                  (ytr-remove-all-but-heading)
                   (insert (format "%s#%s\n" issue-id new-node-id)))
                  ((eq ytr-make-new-comment-behavior 'fetch)
                   (kill-region (point-min) (point-max))
@@ -524,7 +532,8 @@
   "Commit buffer content as a new issue"
   (ytr-browse-new-issue ytr-new-issue-title (buffer-string))
   (set-window-configuration ytr-buffer-wconf)
-  (kill-region (point-min) (point-max))
+  (undo) ; kill-whole-line
+  (ytr-remove-all-but-heading)
   (insert "/(Issue created from deleted content)/\n"))
 
 (defun ytr-commit-new-node ()
