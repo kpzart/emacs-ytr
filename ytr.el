@@ -331,7 +331,7 @@
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login,fullName)),created,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name))")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login,fullName)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name))")))
 
 (defun ytr-retrieve-issue-comment-alist (issue-id comment-id)
   "Retrieve information concering the given issue and return an alist."
