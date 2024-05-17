@@ -283,7 +283,7 @@
            (end (progn (skip-chars-forward "[:alnum:]-#") (point)))
            (str (buffer-substring-no-properties start end)))
       (save-match-data
-        (when (string-match-p "^[A-z]+-[0-9]+$" str)
+        (when (string-match-p "^[A-z]+-[0-9]+\\(#[0-9-]+\\)?$" str)
           `(ytr-shortcode
             ,str
             ,start . ,end))))))
