@@ -147,7 +147,7 @@
 (defun ytr-consult-state-function (action cand)
   ""
   (cl-case action
-    (preview (ytr-sneak-window
+    (preview (ytr-sneak-window-issue
                (cl-find-if (lambda (elem) (string= (alist-get 'idReadable elem) (car (split-string cand ":")))) issues-alist)))
     (exit (quit-window))))
 
@@ -781,7 +781,7 @@
 
 ;;;; preview
 
-(defun ytr-sneak-window (issue-alist)
+(defun ytr-sneak-window-issue (issue-alist)
   (with-output-to-temp-buffer "*ytr-describe-issue*"
     (let-alist issue-alist
     (princ (format "%s: %s\n" .idReadable .summary))
@@ -796,12 +796,15 @@
     (princ "------------------------\n")
     (princ .description))))
 
+(defun ytr-sneak1 (issue-node-ids)
+  "Display a side window with the description and same basic information on issue and comment id cons cell."
+  (let* ((shortcode (car issue-node-ids)))
+    (ytr-sneak-window-issue (ytr-retrieve-issue-alist shortcode))))
+
 (defun ytr-dart-sneak (shortcode-node)
   "Like ytr-sneak but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
   (interactive "sShortcode: ")
-  (let* ((issue-node-ids (ytr-parse-shortcode-and-node-id shortcode-node))
-         (shortcode (car issue-node-ids)))
-    (ytr-sneak-window (ytr-retrieve-issue-alist shortcode))))
+  (ytr-sneak1 (ytr-parse-shortcode-and-node-id shortcode-node)))
 
 (defun ytr-embark-sneak (cand)
   "Like ytr-dart-sneak but cand consists of shortcode and summary"
@@ -814,10 +817,10 @@
                   (ytr-read-shortcode))))
   (ytr-dart-sneak shortcode))
 
-(defun ytr-smart-sneak (shortcode)
+(defun ytr-smart-sneak (issue-comment-ids)
   "Display a side window with the description and same basic information on issue with SHORTCODE"
-  (interactive (list (ytr-guess-or-read-shortcode)))
-  (ytr-sneak-window (ytr-retrieve-issue-alist shortcode)))
+  (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
+  (ytr-sneak1 issue-comment-ids))
 
 ;;;; Copy URL
 
@@ -960,7 +963,7 @@
                                                                     (ytr-add-issue-to-history shortcode)
                                                                     (ytr-dart-org shortcode)))))
                               :must-match 'ignore
-                              :persistent-action 'ytr-sneak-window
+                              :persistent-action 'ytr-sneak-window-issue
                               :keymap (let ((map (make-sparse-keymap)))
                                         (set-keymap-parent map helm-map)
                                         (define-key map (kbd "M-q") (lambda () (interactive) (helm-run-after-exit 'ytr-helm-query query)))
@@ -988,7 +991,7 @@
                                                      :action '(("Open in browser" . (lambda (issue-alist) (browse-url (ytr-issue-url (alist-get 'idReadable issue-alist)))))
                                                                ("Open in org buffer" . (lambda (issue-alist) (ytr-dart-org (alist-get 'idReadable issue-alist)))))
                                                      :must-match 'ignore
-                                                     :persistent-action 'ytr-sneak-window
+                                                     :persistent-action 'ytr-sneak-window-issue
                                                      :cleanup (lambda () (kill-matching-buffers "*ytr-describe-issue*" nil t))
                                                      )
                     :buffer "*helm ytr*")
