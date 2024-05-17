@@ -737,15 +737,22 @@
      (error (undo)
             (signal (car err) (cdr err))))))
 
+(defun ytr-org1 (issue-node-ids)
+  ""
+  (let* ((shortcode (car issue-node-ids))
+         (comment-id (cdr issue-node-ids)))
+    (ytr-issue-alist-to-org (ytr-retrieve-issue-alist "DEMO-21") shortcode)
+    (org-mode)
+    (ytr-shortcode-buttonize-buffer)
+    (goto-char (point-min))
+    (when comment-id
+      (search-forward comment-id nil t)
+      (org-back-to-heading))))
+
 (defun ytr-dart-org (shortcode-node)
   "Like ytr-org but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
   (interactive "sShortcode: ")
-  (let* ((issue-node-ids (ytr-parse-shortcode-and-node-id shortcode-node))
-         (shortcode (car issue-node-ids)))
-    (ytr-issue-alist-to-org (ytr-retrieve-issue-alist shortcode) shortcode)
-    (org-mode)
-    (ytr-shortcode-buttonize-buffer)
-    (goto-char (point-min))))
+  (ytr-org1 (ytr-parse-shortcode-and-node-id shortcode-node)))
 
 (defun ytr-embark-org (cand)
   "Like ytr-dart-org but cand consists of shortcode and summary"
@@ -759,11 +766,11 @@
   (ytr-add-issue-to-history shortcode)
   (ytr-dart-org shortcode))
 
-(defun ytr-smart-org (shortcode)
+(defun ytr-smart-org (issue-comment-ids)
   "Retrieve an issue and convert it to a temporary org buffer"
-  (interactive (list (ytr-guess-or-read-shortcode)))
-  (ytr-add-issue-to-history shortcode)
-  (ytr-dart-org shortcode))
+  (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
+  (ytr-add-issue-to-history (car issue-comment-ids))
+  (ytr-org1 issue-comment-ids))
 
 (defun ytr-org-heading-set-shortcode ()
   "Set Property YTR_SHORTCODE on org heading and append tag YTR"
