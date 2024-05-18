@@ -331,11 +331,11 @@
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,author(login,fullName)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name))")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name))")))
 
 (defun ytr-retrieve-issue-comment-alist (issue-id comment-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,author(login,fullName)")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,updated,author(login,fullName)")))
 
 (defun ytr-send-new-comment-alist (issue-id alist)
   "Send the information in ALIST as a new comment for ticket with id ISSUE-ID"
@@ -788,7 +788,7 @@
     (princ (format "Reporter: %s, created: %s, updated: %s, Resolved: %s, Priority: %s, State: %s, Assignee: %s\n"
                    (alist-get 'fullName .reporter)
                    (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000))
-                   (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000))
+                   (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-")
                    (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-")
                    (ytr-get-customField-value issue-alist "Priority")
                    (ytr-get-customField-value issue-alist "State")
@@ -796,10 +796,27 @@
     (princ "------------------------\n")
     (princ .description))))
 
+(defun ytr-sneak-window-comment (issue-alist comment-id)
+  (with-output-to-temp-buffer "*ytr-describe-comment*"
+    (let-alist (cl-find-if (lambda (elem)
+                             (string= (alist-get 'id elem) comment-id))
+                           (alist-get 'comments issue-alist))
+      ;; comments(id,text,created,author(login,fullName))
+      (princ (format "Comment for %s: %s\n" (alist-get 'idReadable issue-alist) (alist-get 'summary issue-alist)))
+      (princ (format "Author: %s, created: %s, updated: %s\n"
+                     (alist-get 'fullName .author)
+                     (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000))
+                     (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-")))
+      (princ "------------------------\n")
+      (princ .text))))
+
 (defun ytr-sneak1 (issue-node-ids)
   "Display a side window with the description and same basic information on issue and comment id cons cell."
-  (let* ((shortcode (car issue-node-ids)))
-    (ytr-sneak-window-issue (ytr-retrieve-issue-alist shortcode))))
+  (let* ((shortcode (car issue-node-ids))
+         (comment-id (cdr issue-node-ids))
+         (issue-alist (ytr-retrieve-issue-alist shortcode)))
+    (ytr-sneak-window-issue issue-alist)
+    (ytr-sneak-window-comment issue-alist comment-id)))
 
 (defun ytr-dart-sneak (shortcode-node)
   "Like ytr-sneak but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
