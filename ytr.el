@@ -55,11 +55,11 @@
 
 (defcustom ytr-queries () "Define your Queries here" :type '(repeat string) :group 'ytr)
 
-(defcustom ytr-plz-debug nil "Print plz debug messages if non nil" :type 'bool :group 'ytr)
+(defcustom ytr-plz-debug nil "Print plz debug messages if non nil" :type 'boolean :group 'ytr)
 
-(defcustom ytr-use-saved-queries t "Wether to use saved queries of user defined queries" :type 'bool :group 'ytr)
+(defcustom ytr-use-saved-queries t "Wether to use saved queries of user defined queries" :type 'boolean :group 'ytr)
 
-(defcustom ytr-make-new-comment-behavior 'link "What should be done with the region from which a comment was created? One of 'kill, 'fetch (buggy), 'link or nil." :type 'symbol :group 'ytr)
+(defcustom ytr-make-new-comment-behavior 'link "What should be done with the region from which a comment was created? One of 'kill, 'fetch (buggy), 'link or nil." :type '(choice (const kill) (const fetch) (const link)) :group 'ytr)
 
 (defvar ytr-issue-history '() "History for issues")
 (defvar ytr-query-history '() "History for query")
