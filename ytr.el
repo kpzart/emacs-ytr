@@ -351,9 +351,10 @@
   (ytr-plz 'post (concat ytr-baseurl "/api/issues/" issue "?fields=description") (json-encode alist)))
 
 (defun ytr-get-customField-value (issue-alist field-name)
-  (let-alist issue-alist
-    (cdr (assoc 'name (assoc 'value
-                             (cl-find-if (lambda (alist) (equal (cdr (assoc 'name alist)) field-name)) .customFields))))))
+  (let* ((field-alist (cl-find-if (lambda (alist) (equal (cdr (assoc 'name alist)) field-name)) (alist-get 'customFields issue-alist)))
+         (value-alist (assoc 'value field-alist))
+         (value-name (cdr (assoc 'name value-alist))))
+    (if value-name value-name "-")))
 
 ;;;; org mode conversion
 (defun ytr-md-to-org (input level)
