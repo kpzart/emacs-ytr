@@ -103,8 +103,9 @@
 
 (defun ytr-annotate-shortcode (cand)
   "Annotate issue shortcode with some info"
-  (let ((issue-alist (cl-find-if (lambda (elem)
-                                (string= (alist-get 'idReadable elem) (car (split-string cand ":"))))
+  (let* ((shortcode (car (split-string cand ":")))
+         (issue-alist (cl-find-if (lambda (elem)
+                                (string= (alist-get 'idReadable elem) shortcode))
                               issues-alist))) ;; issues-alist comes from ytr-read-shortcode-annotated via lexical binding!
     (let-alist issue-alist
       (marginalia--fields
