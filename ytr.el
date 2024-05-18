@@ -572,6 +572,7 @@
         (curlevel (ytr-max-heading-level)))
     (org-gfm-export-as-markdown nil nil)
     (replace-regexp "^#" "##" nil (point-min) (point-max))
+    (whitespace-cleanup)
     (ytr-commit-new-node-mode)
     (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
     (setq-local ytr-buffer-wconf wconf
@@ -592,6 +593,7 @@
     (org-gfm-export-as-markdown nil nil)
     (replace-regexp "^#" "##" nil (point-min) (point-max))
     (ytr-commit-new-node-mode)
+    (whitespace-cleanup)
     (message "Create new issue with title: %s. C-c to submit, C-k to cancel" title)
     (setq-local ytr-buffer-wconf wconf
                 ytr-buffer-curlevel curlevel
@@ -654,6 +656,7 @@
 
     (org-gfm-export-as-markdown nil t)
     (replace-regexp "^#" "##" nil (point-min) (point-max))
+    (whitespace-cleanup)
     (ytr-commit-update-node-mode)
     (message "Update %s with ID %s on issue %s" type node-id issue-id)
     (setq-local ytr-buffer-wconf wconf
