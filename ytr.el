@@ -51,7 +51,7 @@
 
 (defcustom ytr-access-token "" "Your access token. Maybe a string or function" :type '(choice function string) :group 'ytr)
 
-(defcustom ytr-user-login "" "Your login name, used to identify your issues" :type 'string :group 'ytr)
+(defcustom ytr-user-full-name "" "Your login name, used to identify your issues" :type 'string :group 'ytr)
 
 (defcustom ytr-queries () "Define your Queries here" :type '(repeat string) :group 'ytr)
 
@@ -123,7 +123,7 @@
          (name (alist-get 'name query-alist))
          (total (alist-get 'issues query-alist))
          (unresolved (seq-drop-while (lambda (issue) (alist-get 'resolved issue)) total))
-         (mine (seq-take-while (lambda (issue) (string= ytr-user-login (ytr-get-customField-value issue "Assignee"))) unresolved))
+         (mine (seq-take-while (lambda (issue) (string= ytr-user-full-name (ytr-get-customField-value issue "Assignee"))) unresolved))
          ) ;; queries-alist comes from ytr-read-shortcode-annotated via lexical binding!
       (marginalia--fields
        (name :truncate .5 :face 'marginalia-documentation)
@@ -173,10 +173,16 @@
   (consult--read ytr-queries
                  :history 'ytr-query-history))
 
+(defcustom ytr-only-own-saved-queries t "Filter out saved queries from others" :type 'boolean :group 'ytr)
+
 (defun ytr-read-query-saved-consult ()
   "Use consult to get a query from saved queries"
   (let* ((queries-alist (ytr-retrieve-saved-queries-alist))
-         (choices (mapcar (lambda (item) (alist-get 'query item)) queries-alist)))
+         (queries-alist-filtered (seq-filter (lambda (elem)
+                                               (string= (alist-get 'fullName (alist-get 'owner elem))
+                                                        ytr-user-full-name))
+                                             queries-alist))
+         (choices (mapcar (lambda (item) (alist-get 'query item)) queries-alist-filtered)))
     (consult--read choices
                    :category 'ytr-query
                    :history 'ytr-query-history)))
@@ -328,7 +334,7 @@
 
 (defun ytr-retrieve-saved-queries-alist ()
   "Retrieve list of saved queries"
-  (ytr-plz 'get (concat ytr-baseurl "/api/savedQueries?fields=name,query,issues(resolved,customFields(name,value(name)))")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/savedQueries?fields=name,query,owner(fullName),issues(resolved,customFields(name,value(name)))")))
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
@@ -787,6 +793,7 @@
 ;;;; preview
 
 (defun ytr-sneak-window-issue (issue-alist)
+  "Display a side window with the description and same basic information on issue."
   (with-output-to-temp-buffer "*ytr-describe-issue*"
     (let-alist issue-alist
     (princ (format "%s: %s\n" .idReadable .summary))
@@ -802,6 +809,7 @@
     (princ .description))))
 
 (defun ytr-sneak-window-comment (issue-alist comment-id)
+  "Display a side window with the description and same basic information on the comment."
   (with-output-to-temp-buffer "*ytr-describe-comment*"
     (let-alist (cl-find-if (lambda (elem)
                              (string= (alist-get 'id elem) comment-id))
