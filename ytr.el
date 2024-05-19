@@ -753,7 +753,7 @@
   ""
   (let* ((shortcode (car issue-node-ids))
          (comment-id (cdr issue-node-ids)))
-    (ytr-issue-alist-to-org (ytr-retrieve-issue-alist "DEMO-21") shortcode)
+    (ytr-issue-alist-to-org (ytr-retrieve-issue-alist shortcode))
     (org-mode)
     (ytr-shortcode-buttonize-buffer)
     (goto-char (point-min))
