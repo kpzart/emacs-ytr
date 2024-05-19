@@ -792,23 +792,46 @@
     (if (member "YTR" tags) nil (org-set-tags (append (list "YTR") tags)))))
 
 ;;;; preview
+(defconst ytr-sneak-field-created
+  '("created: %s" . (lambda (issue-alist) (format-time-string "%Y-%m-%d %H:%M" (/ (alist-get 'created issue-alist) 1000))))
+  "Field Definition for Sneak Preview to show the created")
+(defconst ytr-sneak-field-updated
+  '("updated: %s" . (lambda (issue-alist) (let-alist issue-alist (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-"))))
+  "Field Definition for Sneak Preview to show the updated")
+(defconst ytr-sneak-field-resolved
+  '("resolved: %s" . (lambda (issue-alist) (let-alist issue-alist (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-"))))
+  "Field Definition for Sneak Preview to show the Resolved")
+(defconst ytr-sneak-field-reporter
+  '("Reporter: %s" . (lambda (issue-alist) (alist-get 'fullName (alist-get 'reporter issue-alist))))
+  "Field Definition for Sneak Preview to show the Reporter")
+(defconst ytr-sneak-field-priority
+  '("Priority: %s" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Priority")))
+  "Field Definition for Sneak Preview to show the Priority")
+(defconst ytr-sneak-field-state
+  '("State: %s" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "State")))
+  "Field Definition for Sneak Preview to show the State")
+(defconst ytr-sneak-field-assignee
+  '("Assignee: %s" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Assignee")))
+  "Field Definition for Sneak Preview to show the Assignee")
+(defconst ytr-sneak-field-comments
+  '("Comments: %s" . (lambda (issue-alist) (length (alist-get 'comments issue-alist))))
+  "Field Definition for Sneak Preview to show the Comments")
+
+(defcustom ytr-sneak-fields-issue
+  (list ytr-sneak-field-created ytr-sneak-field-updated ytr-sneak-field-resolved ytr-sneak-field-reporter ytr-sneak-field-priority ytr-sneak-field-state ytr-sneak-field-assignee ytr-sneak-field-comments)
+  "List of fields to print in sneak window for issues. Each entry is a cons of a format definition and a function to compute the value, which receives as argument den issue-alist."
+  :type '(repeat (cons string function)) :group 'ytr)
 
 (defun ytr-sneak-window-issue (issue-alist)
   "Display a side window with the description and same basic information on issue."
   (with-output-to-temp-buffer "*ytr-describe-issue*"
     (let-alist issue-alist
-    (princ (format "%s: %s\n" .idReadable .summary))
-    (princ (format "Reporter: %s, created: %s, updated: %s, Resolved: %s, Priority: %s, State: %s, Assignee: %s, Comments: %s\n"
-                   (alist-get 'fullName .reporter)
-                   (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000))
-                   (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-")
-                   (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-")
-                   (ytr-get-customField-value issue-alist "Priority")
-                   (ytr-get-customField-value issue-alist "State")
-                   (ytr-get-customField-value issue-alist "Assignee")
-                   (length (alist-get 'comments issue-alist))))
-    (princ "------------------------\n")
-    (princ .description))))
+      (princ (format "%s: %s\n" .idReadable .summary))
+      (princ (string-join (mapcar (lambda (field)
+                (format (car field) (funcall (cdr field) issue-alist)))
+        ytr-sneak-fields-issue) ", "))
+      (princ "\n------------------------\n")
+      (princ .description))))
 
 (defun ytr-sneak-window-comment (issue-alist comment-id)
   "Display a side window with the description and same basic information on the comment."
