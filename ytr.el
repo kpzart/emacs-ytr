@@ -339,7 +339,7 @@
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name))")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType)")))
 
 (defun ytr-retrieve-issue-comment-alist (issue-id comment-id)
   "Retrieve information concering the given issue and return an alist."
@@ -383,16 +383,16 @@
     (org-unindent-buffer)
     (buffer-string)))
 
-(defun ytr-issue-alist-to-org (input shortcode)
+(defun ytr-issue-alist-to-org (input)
   "Convert an alist of markdown code into an org buffer with proper headings"
-  (let ((bufname (format "*ytr-org-%s*" (downcase shortcode))))
-    (set-buffer (get-buffer-create bufname))
-    (erase-buffer)
-    (org-mode)
-    (let-alist input
+  (let-alist input
+    (let ((bufname (format "*ytr-org-%s*" (downcase .idReadable))))
+      (set-buffer (get-buffer-create bufname))
+      (erase-buffer)
+      (org-mode)
       ;; title and description
       (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
-      (org-set-property "YTR_SHORTCODE" shortcode)
+      (org-set-property "YTR_SHORTCODE" .idReadable)
       (org-set-property "YTR_ID" .id)
       (insert (concat "* ".idReadable ": " .summary "\n\n"))
       (insert "** Links\n\n")
@@ -411,6 +411,12 @@
                     )
                   ))
               .links)
+      (insert "** Attachments\n\n")
+      (mapcar (lambda (attachment-alist)
+                (let-alist attachment-alist
+                  (insert (format "- [[%s%s][%s]] %s %sb\n" ytr-baseurl .url .name .mimeType .size))))
+              .attachments)
+      (insert "\n")
       ;; do the comments
       (mapcar (lambda (comment-alist)
                 (let-alist comment-alist
