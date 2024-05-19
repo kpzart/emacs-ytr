@@ -110,11 +110,12 @@
     (let-alist issue-alist
       (marginalia--fields
        ;; (:left .summary :format " %s" :face 'marginalia-type)
-       ((ytr-get-customField-value issue-alist "Priority") :format "P: %s" :truncate .2 :face 'marginalia-documentation)
-       ((ytr-get-customField-value issue-alist "State") :format "S: %s" :truncate .2 :face 'marginalia-documentation)
-       ((ytr-get-customField-value issue-alist "Assignee") :format "A: %s" :truncate .2 :face 'marginalia-documentation)
-       ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)) :format "c: %s" :truncate 20 :face 'marginalia-documentation)
-       ((format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) :format "u: %s" :truncate 20 :face 'marginalia-documentation)
+       ((ytr-get-customField-value issue-alist "Priority") :format "Pr: %s" :truncate .2 :face 'marginalia-documentation)
+       ((ytr-get-customField-value issue-alist "State") :format "St: %s" :truncate .2 :face 'marginalia-documentation)
+       ((ytr-get-customField-value issue-alist "Assignee") :format "As: %s" :truncate .2 :face 'marginalia-documentation)
+       ((length (alist-get 'comments issue-alist)) :format "Re: %s" :truncate 7 :face 'marginalia-documentation)
+       ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)) :format "ct: %s" :truncate 20 :face 'marginalia-documentation)
+       ((format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) :format "ut: %s" :truncate 20 :face 'marginalia-documentation)
        ))))
 
 (defun ytr-annotate-query (cand)
@@ -330,7 +331,7 @@
 
 (defun ytr-retrieve-query-issues-alist (query)
   "Retrieve list of issues by query"
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,created,updated,resolved,reporter(login,fullName),customFields(name,value(name))&query=" (url-hexify-string query))))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,created,updated,resolved,reporter(login,fullName),customFields(name,value(name)),comments&query=" (url-hexify-string query))))
 
 (defun ytr-retrieve-saved-queries-alist ()
   "Retrieve list of saved queries"
@@ -797,14 +798,15 @@
   (with-output-to-temp-buffer "*ytr-describe-issue*"
     (let-alist issue-alist
     (princ (format "%s: %s\n" .idReadable .summary))
-    (princ (format "Reporter: %s, created: %s, updated: %s, Resolved: %s, Priority: %s, State: %s, Assignee: %s\n"
+    (princ (format "Reporter: %s, created: %s, updated: %s, Resolved: %s, Priority: %s, State: %s, Assignee: %s, Comments: %s\n"
                    (alist-get 'fullName .reporter)
                    (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000))
                    (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-")
                    (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-")
                    (ytr-get-customField-value issue-alist "Priority")
                    (ytr-get-customField-value issue-alist "State")
-                   (ytr-get-customField-value issue-alist "Assignee")))
+                   (ytr-get-customField-value issue-alist "Assignee")
+                   (length (alist-get 'comments issue-alist))))
     (princ "------------------------\n")
     (princ .description))))
 
