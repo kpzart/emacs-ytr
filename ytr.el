@@ -416,7 +416,9 @@
                 (let-alist attachment-alist
                   (insert (format "- [[%s%s][%s]] %s %sb\n" ytr-baseurl .url .name .mimeType .size))))
               .attachments)
-      (insert "\n")
+      (unless (eq .attachments '[])
+        (message (format "%s" .attachments))
+        (insert "\n"))
       ;; do the comments
       (mapcar (lambda (comment-alist)
                 (let-alist comment-alist
