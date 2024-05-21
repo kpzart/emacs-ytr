@@ -446,15 +446,13 @@
   (when (not (org-at-heading-p))
     (org-next-visible-heading 1)
     )
-  (org-current-level)
-  )
+  (org-current-level))
 
 (defun ytr-demote-org-headings (level)
   "Demote all headings in the current buffer so the new max level it LEVEL."
   (let ((base-level (ytr-max-heading-level)))
     (when base-level
-      (ytr-demote-org-headings-by (- level base-level))))
-  )
+      (ytr-demote-org-headings-by (- level base-level)))))
 
 (defun ytr-demote-org-headings-by (level)
   "Demote all headings in the current buffer by the specified LEVEL."
@@ -503,9 +501,9 @@
   )
 
 ;;;; org interactive
-(defvar-keymap ytr-commit-new-node-mode-map "C-c C-c" #'ytr-commit-new-node "C-c C-k" #'ytr-cancel-commit)
+(defvar-keymap ytr-commit-new-comment-mode-map "C-c C-c" #'ytr-commit-new-comment "C-c C-k" #'ytr-cancel-commit)
 
-(define-derived-mode ytr-commit-new-node-mode markdown-mode "ytr-commit-new-node-mode" "Mode for editing markdown exports from org before sending them to youtrack")
+(define-derived-mode ytr-commit-new-comment-mode markdown-mode "ytr-commit-new-comment-mode" "Mode for editing markdown exports from org before sending them to youtrack")
 
 (defvar-keymap ytr-commit-update-node-mode-map "C-c C-c" #'ytr-commit-update-node "C-c C-k" #'ytr-cancel-commit)
 
@@ -544,23 +542,7 @@
                  ((eq ytr-make-new-comment-behavior 'fetch)
                   (kill-region (point-min) (point-max))
                   (ytr-get-insert-remote-node issue-id new-node-id 'comment curlevel)
-                  ))))))
-
-(defun ytr-commit-new-issue ()
-  "Commit buffer content as a new issue"
-  (ytr-browse-new-issue ytr-new-issue-title (buffer-string))
-  (set-window-configuration ytr-buffer-wconf)
-  (undo) ; kill-whole-line
-  (ytr-remove-all-but-heading)
-  (insert "/(Issue created from deleted content)/\n"))
-
-(defun ytr-commit-new-node ()
-  "Commit the buffer to youtrack to create a new node"
-  (interactive)
-  (cl-case ytr-buffer-node-type
-    (comment (ytr-commit-new-comment))
-    (issue (ytr-commit-new-issue))
-    (t (user-error "Bad node type %s" ytr-buffer-node-type)))
+                  )))))
   (widen)
   (ytr-shortcode-buttonize-buffer))
 
@@ -575,7 +557,6 @@
   (message "Node successfully updated")
   (ytr-fetch-remote-node))
 
-
 (defun ytr-new-comment-editable ()
   "Send the current subtree or regio as comment to a ticket"
   (interactive)
@@ -588,7 +569,7 @@
     (org-gfm-export-as-markdown nil nil)
     (replace-regexp "^#" "##" nil (point-min) (point-max))
     (whitespace-cleanup)
-    (ytr-commit-new-node-mode)
+    (ytr-commit-new-comment-mode)
     (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
     (setq-local ytr-buffer-wconf wconf
                 ytr-buffer-curlevel curlevel
@@ -599,22 +580,22 @@
 (defun ytr-new-issue ()
   "Use the current subtree to create a new issue"
   (interactive)
-  (org-narrow-to-subtree)
-  (goto-char (point-min))
-  (setq title (org-get-heading t t t t))
-  (kill-whole-line)
-  (let ((wconf (current-window-configuration))
-        (curlevel (ytr-max-heading-level)))
-    (org-gfm-export-as-markdown nil nil)
-    (replace-regexp "^#" "##" nil (point-min) (point-max))
-    (ytr-commit-new-node-mode)
-    (whitespace-cleanup)
-    (message "Create new issue with title: %s. C-c to submit, C-k to cancel" title)
-    (setq-local ytr-buffer-wconf wconf
-                ytr-buffer-curlevel curlevel
-                ytr-buffer-node-type 'issue
-                ytr-buffer-commit-type 'create
-                ytr-new-issue-title title)))
+  (let ((line (buffer-substring (line-beginning-position) (line-end-position)))
+        (title (org-get-heading t t t t)))
+    (org-cut-subtree)
+    (with-temp-buffer
+      (org-mode)
+      (insert (pop kill-ring))
+      (goto-char (point-min))
+      (kill-whole-line)
+      (save-window-excursion
+        (org-gfm-export-as-markdown nil nil)
+        (replace-regexp "^#" "##" nil (point-min) (point-max))
+        (whitespace-cleanup)
+        (ytr-browse-new-issue title (buffer-string))
+        ))
+    (insert line)
+    (insert "\n\n/(Issue created from deleted content)/\n\n")))
 
 (defun ytr-new-comment ()
   "Send the current subtree as comment to a ticket"
@@ -718,8 +699,7 @@
   (interactive)
   (if (org-entry-get (point) "YTR_TYPE" t)
       (ytr-update-remote-node-editable)
-    (ytr-new-comment-editable))
-  )
+    (ytr-new-comment-editable)))
 
 (defun ytr-get-insert-remote-node (issue-id node-id type level)
   "Insert a remote node in org format"
@@ -964,13 +944,11 @@
                           issues-alist))
          (choice (completing-read "Issue: " choices))
          (choice-id (car (split-string choice ":"))))
-    (browse-url (ytr-issue-url choice-id))
-    )
-  )
+    (browse-url (ytr-issue-url choice-id))))
 
 (defun ytr-browse-new-issue (title description)
   "Open web browser to create a new issue"
-  (browse-url (concat ytr-baseurl "/newIssue?description=" description "&summary=" title)))
+  (browse-url (concat ytr-baseurl "/newIssue?summary=" title "&description=" (url-hexify-string description))))
 
 (defun ytr-browse-query (query)
   "Open web browser to execute a query"
