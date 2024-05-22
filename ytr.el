@@ -946,9 +946,13 @@
          (choice-id (car (split-string choice ":"))))
     (browse-url (ytr-issue-url choice-id))))
 
-(defun ytr-browse-new-issue (title description)
+(defun ytr-browse-new-issue (title &optional description)
   "Open web browser to create a new issue"
-  (browse-url (concat ytr-baseurl "/newIssue?summary=" title "&description=" (url-hexify-string description))))
+  (interactive "sSummary: ")
+  (browse-url (concat (format "%s/newIssue?summary=%s" ytr-baseurl title)
+                      (if description
+                          (format "&description=%s" (url-hexify-string description))
+                        ""))))
 
 (defun ytr-browse-query (query)
   "Open web browser to execute a query"
