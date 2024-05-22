@@ -383,51 +383,57 @@
     (org-unindent-buffer)
     (buffer-string)))
 
-(defun ytr-issue-alist-to-org (input)
+(defun ytr-insert-issue-alist-as-org (issue-alist)
+  "Insert the issue given by ISSUE-ALIST as org at point"
+  ;; title and description
+  (let-alist issue-alist
+   (insert (concat "* ".idReadable ": " .summary "\n\n"))
+   (org-set-property "YTR_SHORTCODE" .idReadable)
+   (org-set-property "YTR_ID" .id)
+   (insert "** Links\n\n")
+   (mapcar (lambda (link-alist)
+             (let-alist link-alist
+               (unless (equal (length .issues) 0)
+                 (insert (format "*** %s\n\n" (cond ((string= .direction "BOTH") (alist-get 'sourceToTarget .linkType))
+                                                    ((string= .direction "INWARD") (alist-get 'targetToSource .linkType))
+                                                    ((string= .direction "OUTWARD") (alist-get 'sourceToTarget .linkType))
+                                                    (t (message "Unknown link direction: %s" .direction)))))
+                 (mapcar (lambda (issue-alist)
+                           (let-alist issue-alist
+                             (insert (format " - *%s*: %s\n" .idReadable .summary))))
+                         .issues)
+                 (insert "\n")
+                 )
+               ))
+           .links)
+   (insert "** Attachments\n\n")
+   (mapcar (lambda (attachment-alist)
+             (let-alist attachment-alist
+               (insert (format "- [[%s%s][%s]] %s %sb\n" ytr-baseurl .url .name .mimeType .size))))
+           .attachments)
+   (unless (eq .attachments '[])
+     (message (format "%s" .attachments))
+     (insert "\n"))
+   ;; do the description
+   (ytr-org-insert-node .description 2 'description .idReadable .id (alist-get 'fullName .reporter) .created)
+   ;; do the comments
+   (let ((shortcode .idReadable))
+     (mapcar (lambda (comment-alist)
+               (let-alist comment-alist
+                 (ytr-org-insert-node .text 2 'comment shortcode .id (alist-get 'fullName .author) .created)))
+             .comments))
+   ;; postprocess
+   (org-unindent-buffer)))
+
+(defun ytr-issue-alist-to-org-buffer (issue-alist)
   "Convert an alist of markdown code into an org buffer with proper headings"
-  (let-alist input
+  (let-alist issue-alist
     (let ((bufname (format "*ytr-org-%s*" (downcase .idReadable))))
       (set-buffer (get-buffer-create bufname))
       (erase-buffer)
       (org-mode)
-      ;; title and description
       (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
-      (org-set-property "YTR_SHORTCODE" .idReadable)
-      (org-set-property "YTR_ID" .id)
-      (insert (concat "* ".idReadable ": " .summary "\n\n"))
-      (insert "** Links\n\n")
-      (mapcar (lambda (link-alist)
-                (let-alist link-alist
-                  (unless (equal (length .issues) 0)
-                    (insert (format "*** %s\n\n" (cond ((string= .direction "BOTH") (alist-get 'sourceToTarget .linkType))
-                                                       ((string= .direction "INWARD") (alist-get 'targetToSource .linkType))
-                                                       ((string= .direction "OUTWARD") (alist-get 'sourceToTarget .linkType))
-                                                       (t (message "Unknown link direction: %s" .direction)))))
-                    (mapcar (lambda (issue-alist)
-                              (let-alist issue-alist
-                                (insert (format " - *%s*: %s\n" .idReadable .summary))))
-                            .issues)
-                    (insert "\n")
-                    )
-                  ))
-              .links)
-      (insert "** Attachments\n\n")
-      (mapcar (lambda (attachment-alist)
-                (let-alist attachment-alist
-                  (insert (format "- [[%s%s][%s]] %s %sb\n" ytr-baseurl .url .name .mimeType .size))))
-              .attachments)
-      (unless (eq .attachments '[])
-        (message (format "%s" .attachments))
-        (insert "\n"))
-      ;; do the comments
-      (mapcar (lambda (comment-alist)
-                (let-alist comment-alist
-                  (ytr-org-insert-node .text 2 'comment shortcode .id (alist-get 'fullName .author) .created)))
-              .comments)
-      ;; do the description
-      (ytr-org-insert-node .description 2 'description shortcode .id (alist-get 'fullName .reporter) .created)
-      ;; postprocess
-      (org-unindent-buffer)
+      (ytr-insert-issue-alist-as-org issue-alist)
       (switch-to-buffer bufname))))
 
 (defun ytr-max-heading-level ()
@@ -473,21 +479,19 @@
 
 (defun ytr-org-insert-node (content level type issue-id node-id author created)
   "Insert a node at point, level is that of the node, type is generic, author is a string, created is a long value"
-  (let ((curpoint (point)))
-    (insert (format "%s %s %s by %s\n\n"
-                    (make-string level ?*)
-                    (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
-                    (ytr-capitalize-first-char (format "%s" type))
-                    author))
-    (previous-line)
-    (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
-    (org-set-property "YTR_ID" node-id)
-    (org-set-property "YTR_TYPE" (format "%s" type))
-    (insert "\n")
-    (when content (insert (ytr-md-to-org content (+ 1 level))))
-    (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
-      (org-set-property "YTR_SHORTCODE" issue-id))
-    (goto-char curpoint)))
+  (insert (format "%s %s %s by %s\n\n"
+                  (make-string level ?*)
+                  (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
+                  (ytr-capitalize-first-char (format "%s" type))
+                  author))
+  (previous-line)
+  (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
+  (org-set-property "YTR_ID" node-id)
+  (org-set-property "YTR_TYPE" (format "%s" type))
+  (insert "\n")
+  (when content (insert (ytr-md-to-org content (+ 1 level))))
+  (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
+    (org-set-property "YTR_SHORTCODE" issue-id)))
 
 (defun ytr-find-node ()
   "Find the parent heading with a YTR_TYPE property, sets the point and returns the type. If property is not found in buffer returns nil."
@@ -741,7 +745,7 @@
   ""
   (let* ((shortcode (car issue-node-ids))
          (comment-id (cdr issue-node-ids)))
-    (ytr-issue-alist-to-org (ytr-retrieve-issue-alist shortcode))
+    (ytr-issue-alist-to-org-buffer (ytr-retrieve-issue-alist shortcode))
     (org-mode)
     (ytr-shortcode-buttonize-buffer)
     (goto-char (point-min))
@@ -778,6 +782,21 @@
   (org-set-property "YTR_SHORTCODE" (org-read-property-value "YTR_SHORTCODE"))
   (let ((tags (org-get-tags)))
     (if (member "YTR" tags) nil (org-set-tags (append (list "YTR") tags)))))
+
+(defun ytr-org-query (query)
+  "Convert all issues given by query to org and collect them in a buffer."
+  (interactive (list (ytr-read-query-consult)))
+  (let ((issues-alist (ytr-retrieve-query-issues-alist query))
+        (bufname "*ytr-org-query*"))
+    (set-buffer (get-buffer-create bufname))
+    (erase-buffer)
+    (org-mode)
+    (insert "#+Title: Org Issues from Query\n\n")
+    (mapcar (lambda (item)
+              (ytr-insert-issue-alist-as-org (ytr-retrieve-issue-alist (alist-get 'idReadable item)))
+              (insert "\n"))
+            issues-alist)
+    (switch-to-buffer bufname)))
 
 ;;;; preview
 (defconst ytr-sneak-field-created
