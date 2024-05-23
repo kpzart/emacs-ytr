@@ -1,0 +1,121 @@
+* Ytr
+
+** Introduction
+
+Functions for youtrack integration in emacs. This package is *not* meant to be a complete interface for youtrack. Instead it targets on these three things:
+
+- Find issues from within emacs, which is much faster than using the youtrack UI.
+- Edit issue description and comments from within emacs in *org mode*, which is much more comfortable than the UI markdown editor.
+- Connect your local org tasks with youtrack issues and make emacs aware of the issue currently being worked on.
+
+** Installation
+
+This package is not on melpa or so, just clone it locally.
+
+** Requirements
+
+- plz
+- consult
+- embark
+- marginalia
+
+There is still some code that uses helm instead of consult, embark and marginalia. But it only loads if helm is present.
+
+The markdown-to-org conversion is done by [[https://pandoc.org][pandoc]]. Therefour this must be installed locally.
+
+** Setup Up
+
+Configure your Youtrack Instance:
+
+#+begin_src emacs-lisp
+(setq ytr-base-url "https://<yourlogin>.youtrack.cloud"
+      ytr-access-token '<yourfunction> ;; recommended, alternatively
+      ytr-access-token "<yourtoken>"
+      ytr-user-full-name "<yourname>" ;; used to identify your own activity
+      )
+#+end_src
+
+You should configure your /Saved Queries/ on Youtrack, as =ytr.el= makes use of it by default.
+
+** Basic Usage
+
+There are a number of basic actions:
+
+- =ytr-(*-)browse=: Visit an issue in your web browser.
+- =ytr-(*-)org=: Visit an issue in an org buffer.
+- =ytr-(*-)sneak=: Show a preview buffer for an issue.
+- =ytr-(*-)copy-url=: Copy the URL for an issue.
+
+All actions come in four interactive different flavors:
+
+- The default flavor is opening a comprehensive completion prompt to select a query, execute it and offer a second completion prompt to select the issue
+- =ytr-dart-*=: Just open a simple completion prompt for the issue shortcode.
+- =ytr-smart-*=: Tries to determine the issue on the context. This may be:
+  - the string under your point
+  - the org properties =YTR_SHORTCODE= and =YTR_ID=
+  - the name of the git branch you are currently working on (assuming it has the form =*/demo-7-*=
+- =ytr-embark-*=: Special flavour to use with embark
+
+You can send contents from your own org files to youtrack easily:
+
+- =ytr-send-node=: Take the current subtree or region (if active) to create a new comment from it. After invocation a markdown buffer pops up, showing you the content to be created and giving you the chance to modify it. Commit with =C-c C-c= or cancel with =C-c C-k=. If you invoke this on an already present comment that you received by =ytr-org= it will try to update the remote comment (realised by some org properties). You will get an error if the comment has been changed on remote side in between, so you have to call =ytr-org= again or call =ytr-fetch-remote-node= on the comment.
+- =ytr-new-issue=: Take the current subtree and open web browser to create a new issue. The subtree heading will be used a summary and the content as description.
+
+Some handy helpers:
+
+- =ytr-org-heading-set-shortcode=: sets the property =YTR_SHORTCODE= on the current heading and add the tag =:YTR:= as a marker. Use this function to connect your org heading with the youtrack issue you are currently working on. *Beware: this function is subject of being renamed in near future.*
+- =ytr-browse-new-issue=: Open browser to create a new plain issue.
+- =org-org-query=: This function converts all issues returned by a given query into org mode and puts them in *one* org buffer. May take long time so handle with care. Experimental!
+- =ytr-shortcode-buttonize-buffer=: ytr makes use of buttons to highlight shortcodes and comment links, call this function to find all the ytr buttons in current buffer.
+
+** Configuration
+
+- =ytr-sneak-fields-issue=: The issue properties shown in the preview window can be configured by modifying this list and appending own functions or removing the predefined.
+- =ytr-use-saved-queries= and =ytr-queries=: Instead of using the /Saved Queries/ of your Youtrack account, you can define your own queries. This has the advantage of being faster when opening the completion prompt.
+- =ytr-only-own-saved-queries=: Saved queries which are not your own will be filtered out by default.
+- =ytr-make-new-comment-behavior=: When you submit a new comment, the default behavior is to replace the region or subtree with a special link of the form =DEMO-7#4-4= which leads you directly to the comment, when calling one of the =ytr-smart-*= actions on it. But this can be changed. See description.
+- =ytr-read-shortcode-function=: By configuring this variable you can select which completion framework you want to use. Default is to use =consult=.
+
+** Keybindings
+
+=ytr.el= does not ship with keybindings. Here is my own spacemacs configuration, that may help you:
+
+#+begin_src emacs-lisp
+(spacemacs/declare-prefix "ot" "ytr")
+(spacemacs/set-leader-keys "otw" 'ytr-smart-browse)
+(spacemacs/set-leader-keys "otW" 'ytr-browse)
+(spacemacs/set-leader-keys "ot C-w" 'ytr-dart-browse)
+(spacemacs/set-leader-keys "oto" 'ytr-smart-org)
+(spacemacs/set-leader-keys "otO" 'ytr-org)
+(spacemacs/set-leader-keys "ot C-o" 'ytr-dart-org)
+(spacemacs/set-leader-keys "otp" 'ytr-smart-sneak)
+(spacemacs/set-leader-keys "otP" 'ytr-sneak)
+(spacemacs/set-leader-keys "ot C-p" 'ytr-dart-sneak)
+(spacemacs/set-leader-keys "oty" 'ytr-smart-copy-url)
+(spacemacs/set-leader-keys "otY" 'ytr-copy-url)
+(spacemacs/set-leader-keys "ot C-y" 'ytr-dart-copy-url)
+(spacemacs/set-leader-keys "otg" 'ytr-guess-shortcode)
+(spacemacs/set-leader-keys "ots" 'ytr-send-node)
+(spacemacs/set-leader-keys "otr" 'ytr-fetch-remote-node)
+(spacemacs/set-leader-keys "otn" 'ytr-new-issue)
+(spacemacs/set-leader-keys "otN" 'ytr-browse-new-issue)
+(spacemacs/set-leader-keys "otb" 'ytr-shortcode-buttonize-buffer)
+(spacemacs/set-leader-keys "ota" 'ytr-org-query)
+#+end_src
+
+** Issues
+
+- Code I don't use may be buggy, especially the helm functions and the new-comment-behavior being different from ='link=.
+- When calling preview on a comment link, two preview buffers are created, one for the comment, one for the issue. unfortunately one is hidden by the other, so switch buffer to see the issue preview.
+
+** Roadmap
+
+The main feature I needed are implemented, some could be improved:
+
+- attachment handling: Mayor issue, since youtrack issues are not unique in name which collides with org attachments
+- preview enhancements: Put beautiful markup in the preview window
+
+** Contributing
+
+Not much to say. Just open an issue and get in contact with me.
+
