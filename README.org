@@ -58,7 +58,7 @@ All actions come in four interactive different flavors:
 
 You can send contents from your own org files to youtrack easily:
 
-- =ytr-send-node=: Take the current subtree or region (if active) to create a new comment from it. After invocation a markdown buffer pops up, showing you the content to be created and giving you the chance to modify it. Commit with =C-c C-c= or cancel with =C-c C-k=. If you invoke this on an already present comment that you received by =ytr-org= it will try to update the remote comment (realised by some org properties). You will get an error if the comment has been changed on remote side in between, so you have to call =ytr-org= again or call =ytr-fetch-remote-node= on the comment.
+- =ytr-send-node=: Take the current subtree or region (if active) to create a new comment from it. After invocation a markdown buffer pops up, showing you the content to be created and giving you the chance to modify it. Commit with =C-c C-c= or cancel with =C-c C-k=. If you invoke this on an already present comment or description that you received by =ytr-org= it will try to update the remote node (realised by some org properties). You will get an error if the node has been changed on remote side in between, so you have to call =ytr-org= again or call =ytr-fetch-remote-node= on the it.
 - =ytr-new-issue=: Take the current subtree and open web browser to create a new issue. The subtree heading will be used a summary and the content as description.
 
 Some handy helpers:
@@ -73,7 +73,7 @@ Some handy helpers:
 - =ytr-sneak-fields-issue=: The issue properties shown in the preview window can be configured by modifying this list and appending own functions or removing the predefined.
 - =ytr-use-saved-queries= and =ytr-queries=: Instead of using the /Saved Queries/ of your Youtrack account, you can define your own queries. This has the advantage of being faster when opening the completion prompt.
 - =ytr-only-own-saved-queries=: Saved queries which are not your own will be filtered out by default.
-- =ytr-make-new-comment-behavior=: When you submit a new comment, the default behavior is to replace the region or subtree with a special link of the form =DEMO-7#4-4= which leads you directly to the comment, when calling one of the =ytr-smart-*= actions on it. But this can be changed. See description.
+- =ytr-make-new-comment-behavior=: When you submit a new comment, the default behavior is to replace the region or subtree with a special link of the form =DEMO-7#4-4= which leads you directly to the comment, when calling one of the =ytr-smart-*= or =ytr-embark-*= actions on it. But this can be changed. See description.
 - =ytr-read-shortcode-function=: By configuring this variable you can select which completion framework you want to use. Default is to use =consult=.
 
 ** Keybindings
@@ -105,7 +105,7 @@ Some handy helpers:
 
 ** Issues
 
-- Code I don't use may be buggy, especially the helm functions and the new-comment-behavior being different from ='link=.
+- Code I don't use may be buggy, especially the helm functions and the new-comment-behavior being different from replacing with a comment link.
 - When calling preview on a comment link, two preview buffers are created, one for the comment, one for the issue. unfortunately one is hidden by the other, so switch buffer to see the issue preview.
 
 ** Roadmap
@@ -117,5 +117,5 @@ The main feature I needed are implemented, some could be improved:
 
 ** Contributing
 
-Not much to say. Just open an issue and get in contact with me.
+Not much to say. Help and suggestions are welcome. Just open an issue and get in contact with me.
 
