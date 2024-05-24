@@ -532,6 +532,7 @@
 
 (defun ytr-commit-new-comment ()
   "Commit buffer content as a new comment"
+  (interactive)
   (setq new-node-id (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-id `((text . ,(buffer-string))))))
   (ytr-add-issue-to-history ytr-buffer-issue-id)
   (let ((issue-id ytr-buffer-issue-id) ;; These vars are buffer local and we are going to switch buffer
