@@ -527,7 +527,7 @@
   (goto-char (point-min))
   (when (org-at-heading-p)
     (forward-line)
-    (when (looking-at-p "\\s-*$") (forward-line))) ; enough for the moment, but this kills the properties
+    (while (looking-at-p "\\s-*\\(:.*\\)?$") (forward-line)))
   (kill-region (point) (point-max)))
 
 (defun ytr-commit-new-comment ()
@@ -563,7 +563,7 @@
   (ytr-fetch-remote-node))
 
 (defun ytr-new-comment-editable ()
-  "Send the current subtree or regio as comment to a ticket"
+  "Send the current subtree or region as comment to a ticket"
   (interactive)
   (cond ((region-active-p) (narrow-to-region (mark) (point)))
         (t (org-narrow-to-subtree)))
