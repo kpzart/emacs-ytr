@@ -585,8 +585,14 @@
 (defun ytr-new-issue ()
   "Use the current subtree to create a new issue"
   (interactive)
-  (let ((line (buffer-substring (line-beginning-position) (line-end-position)))
-        (title (org-get-heading t t t t)))
+  (org-back-to-heading)
+  (let* ((heading-start (point))
+         (heading-end (progn
+                        (forward-line)
+                        (while (looking-at-p "\\s-*\\(:.*\\)?$") (forward-line))
+                        (point)))
+         (heading (buffer-substring heading-start heading-end))
+         (title (org-get-heading t t t t)))
     (org-cut-subtree)
     (with-temp-buffer
       (org-mode)
@@ -599,8 +605,8 @@
         (whitespace-cleanup)
         (ytr-browse-new-issue title (buffer-string))
         ))
-    (insert line)
-    (insert "\n\n/(Issue created from deleted content)/\n\n")))
+    (insert heading)
+    (insert "/(Issue created from deleted content)/\n\n")))
 
 (defun ytr-new-comment ()
   "Send the current subtree as comment to a ticket"
