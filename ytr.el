@@ -377,7 +377,9 @@
       (replace-string "☒" "[X]" t (point-min) (point-max))
      (replace-string "☐" "[ ]" t (point-min) (point-max)))
     (goto-char (point-min))
-    (flush-lines " *:[A-Z_]+:.*$")
+    (flush-lines " *:[A-Z_]+:.*$") ; remove properties
+    (goto-char (point-max))
+    (insert "\n")
     (org-mode)
     (ytr-demote-org-headings (or level 3))
     (org-unindent-buffer)
@@ -800,8 +802,7 @@
     (org-mode)
     (insert "#+Title: Org Issues from Query\n\n")
     (mapcar (lambda (item)
-              (ytr-insert-issue-alist-as-org (ytr-retrieve-issue-alist (alist-get 'idReadable item)))
-              (insert "\n"))
+              (ytr-insert-issue-alist-as-org (ytr-retrieve-issue-alist (alist-get 'idReadable item))))
             issues-alist)
     (switch-to-buffer bufname)))
 
