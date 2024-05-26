@@ -270,10 +270,12 @@
 (defvar-keymap embark-ytr-shortcode-actions
   :doc "Keymap for actions for ytr shortcodes"
   :parent embark-general-map
+  "w" #'ytr-embark-browse
   "o" #'ytr-embark-org
   "p" #'ytr-embark-sneak
   "y" #'ytr-embark-copy-url
-  "w" #'ytr-embark-browse)
+  "l" #'ytr-embark-org-link-heading
+  "c" #'ytr-embark-org-capture)
 
 (add-to-list 'embark-keymap-alist '(ytr-shortcode . embark-ytr-shortcode-actions))
 

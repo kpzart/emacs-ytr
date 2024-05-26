@@ -79,7 +79,18 @@ Some handy helpers:
 
 ** Keybindings
 
-=ytr.el= does not ship with keybindings. Here is my own spacemacs configuration, that may help you:
+=ytr.el= does not ship with keybindings except for those for embark to act on an issue shortcode:
+
+| Key | Action           |
+|-----+------------------|
+| w   | browse           |
+| o   | org              |
+| p   | sneak            |
+| y   | copy url         |
+| l   | org link heading |
+| c   | org capture      |
+
+Here is my own spacemacs configuration, that may help you:
 
 #+begin_src emacs-lisp
 (spacemacs/declare-prefix "ot" "ytr")
@@ -95,6 +106,12 @@ Some handy helpers:
 (spacemacs/set-leader-keys "oty" 'ytr-smart-copy-url)
 (spacemacs/set-leader-keys "otY" 'ytr-copy-url)
 (spacemacs/set-leader-keys "ot C-y" 'ytr-dart-copy-url)
+(spacemacs/set-leader-keys "otc" 'ytr-smart-org-capture)
+(spacemacs/set-leader-keys "otC" 'ytr-org-capture)
+(spacemacs/set-leader-keys "ot C-c" 'ytr-dart-org-capture)
+(spacemacs/set-leader-keys "otl" 'ytr-smart-org-link-heading)
+(spacemacs/set-leader-keys "otL" 'ytr-org-link-heading)
+(spacemacs/set-leader-keys "ot C-l" 'ytr-dart-org-link-heading)
 (spacemacs/set-leader-keys "otg" 'ytr-guess-shortcode)
 (spacemacs/set-leader-keys "ots" 'ytr-send-node)
 (spacemacs/set-leader-keys "otr" 'ytr-fetch-remote-node)
