@@ -414,7 +414,6 @@
                (insert (format "- [[%s%s][%s]] %s %sb\n" ytr-baseurl .url .name .mimeType .size))))
            .attachments)
    (unless (eq .attachments '[])
-     (message (format "%s" .attachments))
      (insert "\n"))
    ;; do the description
    (ytr-org-insert-node .description 2 'description .idReadable .id (alist-get 'fullName .reporter) .created)
@@ -750,7 +749,7 @@
      (error (undo)
             (signal (car err) (cdr err))))))
 
-(defun ytr-org1 (issue-node-ids)
+(defun ytr-org-action (issue-node-ids)
   ""
   (let* ((shortcode (car issue-node-ids))
          (comment-id (cdr issue-node-ids)))
@@ -762,33 +761,9 @@
       (search-forward comment-id nil t)
       (org-back-to-heading))))
 
-(defun ytr-dart-org (shortcode-node)
-  "Like ytr-org but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
-  (interactive "sShortcode: ")
-  (ytr-org1 (ytr-parse-shortcode-and-node-id shortcode-node)))
-
-(defun ytr-embark-org (cand)
-  "Like ytr-dart-org but cand consists of shortcode and summary"
-  (ytr-dart-org (car (split-string cand ":"))))
-
-(defun ytr-org (shortcode)
-  "Retrieve an issue and convert it to a temporary org buffer"
-  (interactive (list
-                (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
-                  (ytr-read-shortcode))))
-  (ytr-add-issue-to-history shortcode)
-  (ytr-dart-org shortcode))
-
-(defun ytr-smart-org (issue-comment-ids)
-  "Retrieve an issue and convert it to a temporary org buffer"
-  (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
-  (ytr-add-issue-to-history (car issue-comment-ids))
-  (ytr-org1 issue-comment-ids))
-
-(defun ytr-org-heading-set-shortcode ()
+(defun ytr-org-link-heading-action (issue-comment-ids)
   "Set Property YTR_SHORTCODE on org heading and append tag YTR"
-  (interactive)
-  (org-set-property "YTR_SHORTCODE" (org-read-property-value "YTR_SHORTCODE"))
+  (org-set-property "YTR_SHORTCODE" (car issue-comment-ids))
   (let ((tags (org-get-tags)))
     (if (member "YTR" tags) nil (org-set-tags (append (list "YTR") tags)))))
 
@@ -863,34 +838,13 @@
       (princ "------------------------\n")
       (princ .text))))
 
-(defun ytr-sneak1 (issue-node-ids)
+(defun ytr-sneak-action (issue-node-ids)
   "Display a side window with the description and same basic information on issue and comment id cons cell."
   (let* ((shortcode (car issue-node-ids))
          (comment-id (cdr issue-node-ids))
          (issue-alist (ytr-retrieve-issue-alist shortcode)))
     (ytr-sneak-window-issue issue-alist)
     (ytr-sneak-window-comment issue-alist comment-id)))
-
-(defun ytr-dart-sneak (shortcode-node)
-  "Like ytr-sneak but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
-  (interactive "sShortcode: ")
-  (ytr-sneak1 (ytr-parse-shortcode-and-node-id shortcode-node)))
-
-(defun ytr-embark-sneak (cand)
-  "Like ytr-dart-sneak but cand consists of shortcode and summary"
-  (ytr-dart-sneak (car (split-string cand ":"))))
-
-(defun ytr-sneak (shortcode)
-  "Display a side window with the description and same basic information on issue with SHORTCODE"
-  (interactive (list
-                (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
-                  (ytr-read-shortcode))))
-  (ytr-dart-sneak shortcode))
-
-(defun ytr-smart-sneak (issue-comment-ids)
-  "Display a side window with the description and same basic information on issue with SHORTCODE"
-  (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
-  (ytr-sneak1 issue-comment-ids))
 
 ;;;; Copy URL
 
@@ -902,63 +856,17 @@
       (ytr-issue-comment-url shortcode comment-id)
     (ytr-issue-url shortcode))))
 
-(defun ytr-copy-url1 (issue-node-ids)
+(defun ytr-copy-url-action (issue-node-ids)
   ""
   (let ((url (ytr-url issue-node-ids)))
     (message url)
     (kill-new url)))
 
-(defun ytr-dart-copy-url (shortcode-node)
-  "Like ytr-copy-url but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
-  (interactive "sShortcode: ")
-  (ytr-copy-url1 (ytr-parse-shortcode-and-node-id shortcode-node)))
-
-(defun ytr-embark-copy-url (cand)
-  "Like ytr-dart-copy-url but cand consists of shortcode and summary"
-  (ytr-dart-copy-url (car (split-string cand ":"))))
-
-(defun ytr-copy-url (shortcode)
-  "Copy the url to an issue to kill ring"
-  (interactive (list
-                (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
-                  (ytr-read-shortcode))))
-  (ytr-add-issue-to-history shortcode)
-  (ytr-dart-copy-url shortcode))
-
-(defun ytr-smart-copy-url (issue-comment-ids)
-  "Open an issue in the webbrowser"
-  (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
-  (ytr-add-issue-to-history (car issue-comment-ids))
-  (ytr-copy-url1 issue-comment-ids))
-
 ;;;; Open in browser
 
-(defun ytr-browse1 (issue-node-ids)
+(defun ytr-browse-action (issue-node-ids)
   ""
   (browse-url (ytr-url issue-node-ids)))
-
-(defun ytr-dart-browse (shortcode-node)
-  "Like ytr-browser but offers a simple prompt for entering the shortcode with no completions. It may have a node id."
-  (interactive "sShortcode: ")
-  (ytr-browse1 (ytr-parse-shortcode-and-node-id shortcode-node)))
-
-(defun ytr-embark-browse (cand)
-  "Like ytr-dart-browse but cand consists of shortcode and summary"
-  (ytr-dart-browse (car (split-string cand ":"))))
-
-(defun ytr-browse (shortcode)
-  "Open an issue in the webbrowser"
-  (interactive (list
-                (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
-                  (ytr-read-shortcode))))
-  (ytr-add-issue-to-history shortcode)
-  (ytr-dart-browse shortcode))
-
-(defun ytr-smart-browse (issue-comment-ids)
-  "Open an issue in the webbrowser"
-  (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
-  (ytr-add-issue-to-history (car issue-comment-ids))
-  (ytr-browse1 issue-comment-ids))
 
 (defun ytr-read-refine-browse ()
   "Edit a predefined query to find an issue and open it in the browser"
@@ -987,6 +895,49 @@
                 (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
                   (ytr-read-query-consult))))
   (browse-url (concat ytr-baseurl "/issues?q=" query)))
+
+;;;; actions
+(defmacro ytr-define-dart-action (name action)
+  `(defun ,(intern (format "ytr-dart-%s" name)) (shortcode-node)
+     ,(format "Like ytr-%s but offers a simple prompt for entering the shortcode with no completions. It may have a node id." name)
+     (interactive "sShortcode (may also have comment id): ")
+     (funcall ,action (ytr-parse-shortcode-and-node-id shortcode-node))))
+
+(defmacro ytr-define-embark-action (name action)
+  `(defun ,(intern (format "ytr-embark-%s" name)) (cand)
+     ,(format "Like ytr-dart-%s but cand consists of shortcode and summary" name)
+     (funcall ,action (cons (car (split-string cand ":")) nil))))
+
+(defmacro ytr-define-base-action (name action)
+  `(defun ,(intern (format "ytr-%s" name)) (shortcode)
+     ,(format "Retrieve an issue from user input and call the %s action on it" name)
+     (interactive (list
+                   (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
+                     (ytr-read-shortcode))))
+     (ytr-add-issue-to-history shortcode)
+     (funcall ,action (cons shortcode nil))))
+
+(defmacro ytr-define-smart-action (name action)
+  `(defun ,(intern (format "ytr-smart-%s" name)) (issue-comment-ids)
+     ,(format "Guess an issue by context and call the %s action on it" name)
+     (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
+     (ytr-add-issue-to-history (car issue-comment-ids))
+     (funcall ,action issue-comment-ids)))
+
+(defmacro ytr-define-action (name action)
+  `(progn
+     (ytr-define-dart-action ,name ,action)
+     (ytr-define-embark-action ,name ,action)
+     (ytr-define-base-action ,name ,action)
+     (ytr-define-smart-action ,name ,action)))
+
+(defun ytr-message-action (ids) (message "Issue %s, Node ID %s" (car ids) (cdr ids)) )
+(ytr-define-action "print" 'ytr-print-action)
+(ytr-define-action "browse" 'ytr-browse-action)
+(ytr-define-action "org" 'ytr-org-action)
+(ytr-define-action "sneak" 'ytr-sneak-action)
+(ytr-define-action "copy-url" 'ytr-copy-url-action)
+(ytr-define-action "org-link-heading" 'ytr-org-link-heading-action)
 
 ;;;; Issue buttons
 
