@@ -896,6 +896,15 @@
                   (ytr-read-query-consult))))
   (browse-url (concat ytr-baseurl "/issues?q=" query)))
 
+;;;; Capture
+(defcustom ytr-capture-key nil "Key for you special template to capture ytr proxy issues" :type 'string :group 'ytr)
+
+(defun ytr-capture-action (issue-comment-ids)
+  "Capture a proxy org task that references an issue on ytr"
+  (setq ytr-summary (alist-get 'summary (ytr-retrieve-issue-alist (car issue-comment-ids))))
+  (org-capture nil ytr-capture-key)
+  (ytr-org-link-heading-action issue-comment-ids))
+
 ;;;; actions
 (defmacro ytr-define-dart-action (name action)
   `(defun ,(intern (format "ytr-dart-%s" name)) (shortcode-node)
@@ -938,6 +947,7 @@
 (ytr-define-action "sneak" 'ytr-sneak-action)
 (ytr-define-action "copy-url" 'ytr-copy-url-action)
 (ytr-define-action "org-link-heading" 'ytr-org-link-heading-action)
+(ytr-define-action "org-capture" 'ytr-capture-action)
 
 ;;;; Issue buttons
 

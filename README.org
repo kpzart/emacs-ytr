@@ -42,8 +42,10 @@ You should configure your /Saved Queries/ on Youtrack, as =ytr.el= makes use of 
 There are a number of basic actions:
 
 - =ytr-(*-)browse=: Visit an issue in your web browser.
-- =ytr-(*-)org=: Visit an issue in an org buffer.
+- =ytr-(*-)org=: Visit an issue in an org buffer. The description and the comments in this buffer can be edited and send to youtrack by =ytr-send-node= (see below).
 - =ytr-(*-)sneak=: Show a preview buffer for an issue.
+- =ytr-(*-)org-link-heading=: Create a reference on an org heading to an issue on youtrack. This sets the property =YTR_SHORTCODE= on the current heading and add the tag =:YTR:= as a marker. Use this function to connect your org heading with the youtrack issue you are currently working on.
+- =ytr-(*-)org-capture=: Capture a proxy org task that references an issue on youtrack. You need to specify an org capture template (see =org-capture-templates=), in which you can reference =%(ytr-summary)= to get the issue summary in your captured task. The new task will automatically linked to the issue on youtrack by setting =YTR_SHORTCODE= and gets the =:YTR:= tag.
 - =ytr-(*-)copy-url=: Copy the URL for an issue.
 
 All actions come in four interactive different flavors:
@@ -63,7 +65,6 @@ You can send contents from your own org files to youtrack easily:
 
 Some handy helpers:
 
-- =ytr-org-heading-set-shortcode=: sets the property =YTR_SHORTCODE= on the current heading and add the tag =:YTR:= as a marker. Use this function to connect your org heading with the youtrack issue you are currently working on. *Beware: this function is subject of being renamed in near future.*
 - =ytr-browse-new-issue=: Open browser to create a new plain issue.
 - =org-org-query=: This function converts all issues returned by a given query into org mode and puts them in *one* org buffer. May take long time so handle with care. Experimental!
 - =ytr-shortcode-buttonize-buffer=: ytr makes use of buttons to highlight shortcodes and comment links, call this function to find all the ytr buttons in current buffer.
