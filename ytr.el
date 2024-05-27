@@ -899,7 +899,7 @@
   (browse-url (concat ytr-baseurl "/issues?q=" query)))
 
 ;;;; Capture
-(defcustom ytr-capture-key nil "Key for you special template to capture ytr proxy issues" :type 'string :group 'ytr)
+(defcustom ytr-capture-key "" "Key for you special template to capture ytr proxy issues" :type 'string :group 'ytr)
 
 (defun ytr-capture-action (issue-comment-ids)
   "Capture a proxy org task that references an issue on ytr"
