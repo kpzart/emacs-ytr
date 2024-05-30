@@ -771,9 +771,11 @@
 
 (defun ytr-org-link-heading-action (issue-comment-ids)
   "Set Property YTR_SHORTCODE on org heading and append tag YTR"
-  (org-set-property "YTR_SHORTCODE" (car issue-comment-ids))
-  (let ((tags (org-get-tags)))
-    (if (member "YTR" tags) nil (org-set-tags (append (list "YTR") tags)))))
+  (save-excursion
+    (org-set-property "YTR_SHORTCODE" (car issue-comment-ids))
+    (org-back-to-heading)
+    (let ((tags (org-get-tags)))
+      (if (member "YTR" tags) nil (org-set-tags (append (list "YTR") tags))))))
 
 (defun ytr-org-query (query)
   "Convert all issues given by query to org and collect them in a buffer."
