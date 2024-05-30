@@ -341,11 +341,11 @@
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType)")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType)")))
 
 (defun ytr-retrieve-issue-comment-alist (issue-id comment-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,updated,author(login,fullName)")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)")))
 
 (defun ytr-send-new-comment-alist (issue-id alist)
   "Send the information in ALIST as a new comment for ticket with id ISSUE-ID"
@@ -410,12 +410,12 @@
                  )
                ))
            .links)
-   (insert "** Attachments\n\n")
-   (mapcar (lambda (attachment-alist)
-             (let-alist attachment-alist
-               (insert (format "- [[%s%s][%s]] %s %sb\n" ytr-baseurl .url .name .mimeType .size))))
-           .attachments)
    (unless (eq .attachments '[])
+     (insert "** Attachments\n\n")
+     (mapcar (lambda (attachment-alist)
+               (let-alist attachment-alist
+                 (insert (format "- [[%s%s][%s]] %s %sb\n" ytr-baseurl .url .name .mimeType (file-size-human-readable .size)))))
+             .attachments)
      (insert "\n"))
    ;; do the description
    (ytr-org-insert-node .description 2 'description .idReadable .id (alist-get 'fullName .reporter) .created)
@@ -830,6 +830,12 @@
       (princ (string-join (mapcar (lambda (field)
                 (format (car field) (funcall (cdr field) issue-alist)))
         ytr-sneak-fields-issue) ", "))
+      (unless (= (length .attachments) 0)
+        (princ "\nAttachments:")
+        (mapcar (lambda (attachment-alist)
+                  (let-alist attachment-alist
+                    (princ (format " [\"%s\" %s %s]" .name .mimeType (file-size-human-readable .size)))))
+                .attachments))
       (princ "\n------------------------\n")
       (princ .description))))
 
@@ -841,11 +847,17 @@
                            (alist-get 'comments issue-alist))
       ;; comments(id,text,created,author(login,fullName))
       (princ (format "Comment for %s: %s\n" (alist-get 'idReadable issue-alist) (alist-get 'summary issue-alist)))
-      (princ (format "Author: %s, created: %s, updated: %s\n"
+      (princ (format "Author: %s, created: %s, updated: %s"
                      (alist-get 'fullName .author)
                      (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000))
                      (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-")))
-      (princ "------------------------\n")
+      (unless (= (length .attachments) 7)
+        (princ "\nAttachments:")
+        (mapcar (lambda (attachment-alist)
+                  (let-alist attachment-alist
+                    (princ (format " [\"%s\" %s %s]" .name .mimeType (file-size-human-readable .size)))))
+                .attachments))
+      (princ "\n------------------------\n")
       (princ .text))))
 
 (defun ytr-sneak-action (issue-node-ids)
