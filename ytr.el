@@ -426,7 +426,11 @@
                  (ytr-org-insert-node .text 2 'comment shortcode .id (alist-get 'fullName .author) .created)))
              .comments))
    ;; postprocess
-   (org-unindent-buffer)))
+   (org-unindent-buffer)
+   (mapcar (lambda (attachment-alist)
+             (let-alist attachment-alist
+               (replace-regexp-in-region (format "\\[file:%s\\]" .name) (format "[%s%s&ytr_name=%s]" ytr-baseurl .url .name) (point-min) (point-max))))
+           .attachments)))
 
 (defun ytr-issue-alist-to-org-buffer (issue-alist)
   "Convert an alist of markdown code into an org buffer with proper headings"
@@ -665,7 +669,9 @@
         (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
 
     (org-gfm-export-as-markdown nil t)
-    (replace-regexp "^#" "##" nil (point-min) (point-max))
+    (replace-regexp-in-region "^#" "##" (point-min) (point-max))
+    (replace-regexp-in-region (format "(%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "(\\1)" (point-min) (point-max))
+
     (whitespace-cleanup)
     (ytr-commit-update-node-mode)
     (message "Update %s with ID %s on issue %s" type node-id issue-id)
