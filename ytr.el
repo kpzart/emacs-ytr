@@ -341,7 +341,7 @@
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType)")))
+  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType,comment(id))")))
 
 (defun ytr-retrieve-issue-comment-alist (issue-id comment-id)
   "Retrieve information concering the given issue and return an alist."
@@ -414,16 +414,24 @@
      (insert "** Attachments\n\n")
      (mapcar (lambda (attachment-alist)
                (let-alist attachment-alist
-                 (insert (format "- [[%s%s][%s]] %s %sb\n" ytr-baseurl .url .name .mimeType (file-size-human-readable .size)))))
+                 (insert (format "- [[%s%s][%s]] %s %s (%s)\n"
+                                 ytr-baseurl
+                                 .url
+                                 .name
+                                 .mimeType
+                                 (file-size-human-readable .size)
+                                 (if .comment
+                                     (format "Comment %s" (alist-get 'id .comment))
+                                   "Issue")))))
              .attachments)
      (insert "\n"))
    ;; do the description
-   (ytr-org-insert-node .description 2 'description .idReadable .id (alist-get 'fullName .reporter) .created)
+   (ytr-org-insert-node .description 2 'description .idReadable .id (alist-get 'fullName .reporter) .created (/= (length .attachments) 0))
    ;; do the comments
    (let ((shortcode .idReadable))
      (mapcar (lambda (comment-alist)
                (let-alist comment-alist
-                 (ytr-org-insert-node .text 2 'comment shortcode .id (alist-get 'fullName .author) .created)))
+                 (ytr-org-insert-node .text 2 'comment shortcode .id (alist-get 'fullName .author) .created (/= (length .attachments) 0))))
              .comments))
    ;; postprocess
    (org-unindent-buffer)
@@ -484,17 +492,19 @@
           (rest-str   (substring string 1)))
       (concat (capitalize first-char) rest-str))))
 
-(defun ytr-org-insert-node (content level type issue-id node-id author created)
+(defun ytr-org-insert-node (content level type issue-id node-id author created hasattachments)
   "Insert a node at point, level is that of the node, type is generic, author is a string, created is a long value"
-  (insert (format "%s %s %s by %s\n\n"
+  (insert (format "%s %s %s by %s"
                   (make-string level ?*)
                   (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
                   (ytr-capitalize-first-char (format "%s" type))
                   author))
-  (previous-line)
+  (when hasattachments (org-set-tags '("YTR_ATTACH")))
+  ;; (previous-line)
   (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
   (org-set-property "YTR_ID" node-id)
   (org-set-property "YTR_TYPE" (format "%s" type))
+  (goto-char (point-max))
   (insert "\n")
   (when content (insert (ytr-md-to-org content (+ 1 level))))
   (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
@@ -736,7 +746,7 @@
           (if (eq type 'description)
               (alist-get 'description node-alist)
             (alist-get 'text node-alist))))
-    (ytr-org-insert-node content level type issue-id node-id author created)))
+    (ytr-org-insert-node content level type issue-id node-id author created (/= (length (alist-get 'attachments node)) 0))))
 
 (defun ytr-fetch-remote-node ()
   "Update a local node withs its remote content"
