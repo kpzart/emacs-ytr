@@ -437,7 +437,7 @@
    (org-unindent-buffer)
    (mapcar (lambda (attachment-alist)
              (let-alist attachment-alist
-               (replace-regexp-in-region (format "\\[file:%s\\]" .name) (format "[%s%s&ytr_name=%s]" ytr-baseurl .url .name) (point-min) (point-max))))
+               (replace-string-in-region (format "[[file:%s]]" .name) (format "[[%s%s&forceDownload=true&ytr_name=%s][%s]]" ytr-baseurl .url .name .name) (point-min) (point-max))))
            .attachments)))
 
 (defun ytr-issue-alist-to-org-buffer (issue-alist)
@@ -563,7 +563,7 @@
                   (insert (format "%s#%s\n" issue-id new-node-id)))
                  ((eq ytr-make-new-comment-behavior 'fetch)
                   (kill-region (point-min) (point-max))
-                  (ytr-get-insert-remote-node issue-id new-node-id 'comment curlevel)
+                  (ytr-insert-remote-node issue-id new-node-id 'comment curlevel)
                   )))))
   (widen)
   (ytr-shortcode-buttonize-buffer))
@@ -649,7 +649,7 @@
                   (insert (format "%s#%s\n" issue-id new-node-id)))
                  ((eq ytr-make-new-comment-behavior 'fetch)
                   (kill-region (point-min) (point-max))
-                  (ytr-get-insert-remote-node issue-id new-node-id 'comment curlevel)
+                  (ytr-insert-remote-node issue-id new-node-id 'comment curlevel)
                   ;; (goto-char (point-min))
                   ;; (unless (org-entry-get (point) "YTR_SHORTCODE" t)
                   ;;   (org-set-property "YTR_SHORTCODE" issue-id))
@@ -680,7 +680,7 @@
 
     (org-gfm-export-as-markdown nil t)
     (replace-regexp-in-region "^#" "##" (point-min) (point-max))
-    (replace-regexp-in-region (format "(%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "(\\1)" (point-min) (point-max))
+    (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "![](\\1)" (point-min) (point-max))
 
     (whitespace-cleanup)
     (ytr-commit-update-node-mode)
@@ -731,7 +731,7 @@
       (ytr-update-remote-node-editable)
     (ytr-new-comment-editable)))
 
-(defun ytr-get-insert-remote-node (issue-id node-id type level)
+(defun ytr-insert-remote-node (issue-id node-id type level)
   "Insert a remote node in org format"
   (let* ((node-alist
           (if (eq type 'description)
@@ -763,7 +763,7 @@
     (let ((inhibit-message t))
       (org-cut-subtree))
     (condition-case err
-     (ytr-get-insert-remote-node issue-id node-id type curlevel)
+     (ytr-insert-remote-node issue-id node-id type curlevel)
      (error (undo)
             (signal (car err) (cdr err))))))
 

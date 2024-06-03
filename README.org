@@ -23,6 +23,8 @@ There is still some code that uses helm instead of consult, embark and marginali
 
 The markdown-to-org conversion is done by [[https://pandoc.org][pandoc]]. Therefour this must be installed locally.
 
+To show images in the org buffers install [[https://github.com/gaoDean/org-remoteimg][org-remoteimg]] or similar.
+
 ** Setup
 
 Configure your Youtrack Instance:
