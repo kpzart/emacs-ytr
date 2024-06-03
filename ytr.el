@@ -494,21 +494,22 @@
 
 (defun ytr-org-insert-node (content level type issue-id node-id author created hasattachments)
   "Insert a node at point, level is that of the node, type is generic, author is a string, created is a long value"
-  (insert (format "%s %s %s by %s"
-                  (make-string level ?*)
-                  (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
-                  (ytr-capitalize-first-char (format "%s" type))
-                  author))
-  (when hasattachments (org-set-tags '("YTR_ATTACH")))
-  ;; (previous-line)
-  (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
-  (org-set-property "YTR_ID" node-id)
-  (org-set-property "YTR_TYPE" (format "%s" type))
-  (goto-char (point-max))
-  (insert "\n")
-  (when content (insert (ytr-md-to-org content (+ 1 level))))
-  (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
-    (org-set-property "YTR_SHORTCODE" issue-id)))
+  (let ((start (point)))
+    (open-line 1)
+    (insert (format "%s %s %s by %s\n\n"
+                    (make-string level ?*)
+                    (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
+                    (ytr-capitalize-first-char (format "%s" type))
+                    author))
+    (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
+    (org-set-property "YTR_ID" node-id)
+    (org-set-property "YTR_TYPE" (format "%s" type))
+    (when content (insert (ytr-md-to-org content (+ 1 level))))
+    (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
+      (org-set-property "YTR_SHORTCODE" issue-id))
+    (save-excursion
+      (goto-char start)
+      (when hasattachments (org-set-tags '("YTR_ATTACH"))))))
 
 (defun ytr-find-node ()
   "Find the parent heading with a YTR_TYPE property, sets the point and returns the type. If property is not found in buffer returns nil."
@@ -746,7 +747,7 @@
           (if (eq type 'description)
               (alist-get 'description node-alist)
             (alist-get 'text node-alist))))
-    (ytr-org-insert-node content level type issue-id node-id author created (/= (length (alist-get 'attachments node)) 0))))
+    (ytr-org-insert-node content level type issue-id node-id author created (/= (length (alist-get 'attachments node-alist)) 0))))
 
 (defun ytr-fetch-remote-node ()
   "Update a local node withs its remote content"
