@@ -237,7 +237,7 @@
         (match-string 2 branch-name))))
 
 (defun ytr-guess-shortcode ()
-  "Return a shortcode from current context."
+  "Return a shortcode string from current context."
   (interactive)
   (let ((issue (ytr-shortcode-from-point)))
     (if issue issue
@@ -247,7 +247,7 @@
             (if issue issue nil)))))))
 
 (defun ytr-guess-shortcode-and-comment-id ()
-  "Return a shortcode from current context."
+  "Return a cons cell from shortcode and comment id from current context."
   (let ((issue-comment-ids (ytr-shortcode-and-comment-id-from-point)))
     (if issue-comment-ids issue-comment-ids
       (let ((issue (ytr-shortcode-from-org-property)))
@@ -273,7 +273,9 @@
   "w" #'ytr-embark-browse
   "o" #'ytr-embark-org
   "p" #'ytr-embark-sneak
-  "y" #'ytr-embark-copy-url
+  "u" #'ytr-embark-copy-url
+  "y" #'ytr-embark-copy-shortcode
+  "i" #'ytr-embark-insert-shortcode
   "l" #'ytr-embark-org-link-heading
   "c" #'ytr-embark-org-capture)
 
@@ -895,6 +897,21 @@
     (message url)
     (kill-new url)))
 
+;;;; Get Shortcode
+(defun ytr-shortcode-action (issue-node-ids)
+  "Return a string representing shortcode and comment id."
+  (if (cdr issue-node-ids)
+      (format "%s#%s" (car issue-node-ids) (cdr issue-node-ids))
+    (car issue-node-ids)))
+
+(defun ytr-copy-shortcode-action (issue-node-ids)
+  "Put a string for shortcode and comment id on kill ring."
+  (kill-new (ytr-shortcode-action issue-node-ids)))
+
+(defun ytr-insert-shortcode-action (issue-node-ids)
+  "Insert a string for shortcode and comment id."
+  (insert (ytr-shortcode-action issue-node-ids)))
+
 ;;;; Open in browser
 
 (defun ytr-browse-action (issue-node-ids)
@@ -975,6 +992,8 @@
 
 (defun ytr-message-action (ids) (message "Issue %s, Node ID %s" (car ids) (cdr ids)) )
 (ytr-define-action "print" 'ytr-print-action)
+(ytr-define-action "copy-shortcode" 'ytr-copy-shortcode-action)
+(ytr-define-action "insert-shortcode" 'ytr-insert-shortcode-action)
 (ytr-define-action "browse" 'ytr-browse-action)
 (ytr-define-action "org" 'ytr-org-action)
 (ytr-define-action "sneak" 'ytr-sneak-action)
