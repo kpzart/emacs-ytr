@@ -276,6 +276,7 @@
   "u" #'ytr-embark-copy-url
   "y" #'ytr-embark-copy-shortcode
   "i" #'ytr-embark-insert-shortcode
+  "m" #'ytr-embark-message-shortcode
   "l" #'ytr-embark-org-link-heading
   "c" #'ytr-embark-org-capture)
 
@@ -912,6 +913,9 @@
   "Insert a string for shortcode and comment id."
   (insert (ytr-shortcode-action issue-node-ids)))
 
+(defun ytr-message-shortcode-action (issue-node-ids)
+  "Echo shortcode and comment id in message area."
+  (message (ytr-shortcode-action issue-node-ids)))
 ;;;; Open in browser
 
 (defun ytr-browse-action (issue-node-ids)
@@ -991,7 +995,7 @@
      (ytr-define-smart-action ,name ,action)))
 
 (defun ytr-message-action (ids) (message "Issue %s, Node ID %s" (car ids) (cdr ids)) )
-(ytr-define-action "print" 'ytr-print-action)
+(ytr-define-action "message-shortcode" 'ytr-message-shortcode-action)
 (ytr-define-action "copy-shortcode" 'ytr-copy-shortcode-action)
 (ytr-define-action "insert-shortcode" 'ytr-insert-shortcode-action)
 (ytr-define-action "browse" 'ytr-browse-action)
