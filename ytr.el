@@ -7,7 +7,7 @@
 ;; Keywords: convenience
 ;; URL: https://github.com/matlantis/emacs-ytr
 ;; Version: 0.1
-;; Package-Requires: (plz)
+;; Package-Requires: ()
 ;; This file is not part of GNU Emacs.
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -39,7 +39,7 @@
 ;;;; Basic
 
 (require 'ffap)
-(require 'plz)
+(require 'request)
 (require 'embark)
 (require 'consult)
 (require 'marginalia)
@@ -55,7 +55,7 @@
 
 (defcustom ytr-queries () "Define your Queries here" :type '(repeat string) :group 'ytr)
 
-(defcustom ytr-plz-debug nil "Print plz debug messages if non nil" :type 'boolean :group 'ytr)
+(defcustom ytr-request-debug nil "Print request debug messages if non nil" :type 'boolean :group 'ytr)
 
 (defcustom ytr-use-saved-queries t "Wether to use saved queries of user defined queries" :type 'boolean :group 'ytr)
 
@@ -316,51 +316,56 @@
 )
 
 ;;;; api
-(defun ytr-plz (method request &optional body)
-  "Generic plz request method"
-  (let* ((response (plz method request
+(defun ytr-request (method url &optional body)
+  "Generic request method."
+  (let* ((request-timeout 10)
+         (response (request url
+                     :type method
                      :headers `(("Authorization" . ,(concat "Bearer "
                                                             (if (functionp ytr-access-token)
                                                                 (funcall ytr-access-token)
                                                               (format "%s" ytr-access-token))))
                                 ("Accept" . "application/json")
                                 ("Content-Type" . "application/json"))
-                     :as #'json-read
-                     :body body
-                     :connect-timeout 10
-                     )))
-    (cond (ytr-plz-debug
-           (message "YTR Request: %s" request)
-           (message "YTR Response: %s" response)))
-    response))
+                     :data body
+                     :sync t
+                     :parser 'json-read
+                     :complete (cl-function (lambda (&key response &allow-other-keys)
+                                              (when ytr-request-debug (message "Done: %s" (request-response-status-code response)))))
+                     ))
+         (response-status (request-response-status-code response))
+         (response-data (request-response-data response)))
+    (if (or (< response-status 200) (> response-status 299))
+        (user-error "Request failed with status %s and message %s" response-status response)
+      response-data)))
 
 (defun ytr-retrieve-query-issues-alist (query)
   "Retrieve list of issues by query"
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,created,updated,resolved,reporter(login,fullName),customFields(name,value(name)),comments&query=" (url-hexify-string query))))
+  (ytr-request "GET" (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,created,updated,resolved,reporter(login,fullName),customFields(name,value(name)),comments&query=" (url-hexify-string query))))
 
 (defun ytr-retrieve-saved-queries-alist ()
   "Retrieve list of saved queries"
-  (ytr-plz 'get (concat ytr-baseurl "/api/savedQueries?fields=name,query,owner(fullName),issues(resolved,customFields(name,value(name)))")))
+  (ytr-request "GET" (concat ytr-baseurl "/api/savedQueries?fields=name,query,owner(fullName),issues(resolved,customFields(name,value(name)))")))
 
 (defun ytr-retrieve-issue-alist (issue-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType,comment(id))")))
+  (ytr-request "GET" (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType,comment(id))")))
 
 (defun ytr-retrieve-issue-comment-alist (issue-id comment-id)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-plz 'get (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)")))
+  (ytr-request "GET" (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)")))
 
 (defun ytr-send-new-comment-alist (issue-id alist)
   "Send the information in ALIST as a new comment for ticket with id ISSUE-ID"
-  (ytr-plz 'post (concat ytr-baseurl "/api/issues/" issue-id "/comments/") (json-encode alist)))
+  (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue-id "/comments/") (json-encode alist)))
 
 (defun ytr-send-issue-comment-alist (issue-id comment-id alist)
   "Send the information in ALIST for a remote update of an issue comment with id ISSUE"
-  (ytr-plz 'post (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=text") (json-encode alist)))
+  (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=text") (json-encode alist)))
 
 (defun ytr-send-issue-alist (issue alist)
   "Send the information in ALIST for a remote update of issue with id ISSUE"
-  (ytr-plz 'post (concat ytr-baseurl "/api/issues/" issue "?fields=description") (json-encode alist)))
+  (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue "?fields=description") (json-encode alist)))
 
 (defun ytr-get-customField-value (issue-alist field-name)
   (let* ((field-alist (cl-find-if (lambda (alist) (equal (cdr (assoc 'name alist)) field-name)) (alist-get 'customFields issue-alist)))
