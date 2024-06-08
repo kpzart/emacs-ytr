@@ -339,6 +339,29 @@
         (user-error "Request failed with status %s and message %s" response-status response)
       response-data)))
 
+(defun ytr-request-upload (url &optional paths)
+  "Generic request method for uploading a list of files."
+  (let* ((request-timeout 10)
+         (response (request url
+                     :type "POST"
+                     :headers `(("Authorization" . ,(concat "Bearer "
+                                                            (if (functionp ytr-access-token)
+                                                                (funcall ytr-access-token)
+                                                              (format "%s" ytr-access-token))))
+                                ("Accept" . "application/json")
+                                ("Content-Type" . "multipart/form-data"))
+                     :files (mapcar (lambda (path) (cons (file-name-nondirectory path) path)) paths)
+                     :sync t
+                     :parser 'json-read
+                     :complete (cl-function (lambda (&key response &allow-other-keys)
+                                              (when ytr-request-debug (message "Done: %s" (request-response-status-code response)))))
+                     ))
+         (response-status (request-response-status-code response))
+         (response-data (request-response-data response)))
+    (if (or (< response-status 200) (> response-status 299))
+        (user-error "Request failed with status %s and message %s" response-status response)
+      response-data)))
+
 (defun ytr-retrieve-query-issues-alist (query)
   "Retrieve list of issues by query"
   (ytr-request "GET" (concat ytr-baseurl "/api/issues?fields=idReadable,summary,description,created,updated,resolved,reporter(login,fullName),customFields(name,value(name)),comments&query=" (url-hexify-string query))))
@@ -366,6 +389,11 @@
 (defun ytr-send-issue-alist (issue alist)
   "Send the information in ALIST for a remote update of issue with id ISSUE"
   (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue "?fields=description") (json-encode alist)))
+
+(defun ytr-send-attachments (paths issue-id &optional comment-id)
+  "Attach the file to the ticket with id ISSUE-ID"
+  (ytr-request-upload (concat ytr-baseurl "/api/issues/" issue-id (if comment-id (format "/comments/%s" comment-id) "") "/attachments?fields=id,name") paths))
+
 
 (defun ytr-get-customField-value (issue-alist field-name)
   (let* ((field-alist (cl-find-if (lambda (alist) (equal (cdr (assoc 'name alist)) field-name)) (alist-get 'customFields issue-alist)))
@@ -746,6 +774,14 @@
             issues-alist)
     (switch-to-buffer bufname)))
 
+(defun ytr-send-node-attachments ()
+  "Send the attachments at node to issue and remove them locally (will ask)."
+  (interactive)
+  (let* ((issue-node-ids (ytr-guess-or-read-shortcode-and-comment-id)))
+    (ytr-send-attachments (mapcar (lambda (filename)
+                                    (file-name-concat (expand-file-name (org-attach-dir)) filename))
+                                  (org-attach-file-list (org-attach-dir)))
+                          (car issue-node-ids) (cdr issue-node-ids))))
 ;;;; preview
 (defconst ytr-sneak-field-created
   '("created: %s" . (lambda (issue-alist) (format-time-string "%Y-%m-%d %H:%M" (/ (alist-get 'created issue-alist) 1000))))
