@@ -390,7 +390,7 @@
   "Send the information in ALIST for a remote update of issue with id ISSUE"
   (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue "?fields=description") (json-encode alist)))
 
-(defun ytr-send-attachments (paths issue-id &optional comment-id)
+(defun ytr-send-as-attachments (paths issue-id &optional comment-id)
   "Attach the file to the ticket with id ISSUE-ID"
   (ytr-request-upload (concat ytr-baseurl "/api/issues/" issue-id (if comment-id (format "/comments/%s" comment-id) "") "/attachments?fields=id,name") paths))
 
@@ -585,40 +585,46 @@
   (goto-char (point-min))
   (when (org-at-heading-p)
     (forward-line)
-    (while (looking-at-p "\\s-*\\(:.*\\)?$") (forward-line)))
+    (while (and (>= (line-number-at-pos) (line-number-at-pos (window-end)))
+                (looking-at-p "\\s-*\\(:.*\\)?$"))
+      (forward-line)))
   (kill-region (point) (point-max)))
 
 (defun ytr-commit-new-comment ()
   "Commit buffer content as a new comment"
   (interactive)
-  (setq new-node-id (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-id `((text . ,(buffer-string))))))
-  (ytr-add-issue-to-history ytr-buffer-issue-id)
-  (let ((issue-id ytr-buffer-issue-id) ;; These vars are buffer local and we are going to switch buffer
+  (let ((new-node-id (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-id `((text . ,(buffer-string))))))
+        (issue-id ytr-buffer-issue-id) ;; These vars are buffer local and we are going to switch buffer
         (curlevel ytr-buffer-curlevel))
     (set-window-configuration ytr-buffer-wconf)
-    (cond (new-node-id
-           (message "New comment created on %s with node id %s." issue-id new-node-id)
-           (cond ((eq ytr-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
-                 ((eq ytr-make-new-comment-behavior 'link)
-                  (ytr-remove-all-but-heading)
-                  (insert (format "%s#%s\n" issue-id new-node-id)))
-                 ((eq ytr-make-new-comment-behavior 'fetch)
-                  (kill-region (point-min) (point-max))
-                  (ytr-insert-remote-comment issue-id new-node-id curlevel)
-                  )))))
-  (widen)
-  (ytr-shortcode-buttonize-buffer))
+    (when new-node-id
+      (ytr-add-issue-to-history issue-id)
+      (message "New comment created on %s with node id %s." issue-id new-node-id)
+      (ytr-send-attachments-action (cons issue-id new-node-id))
+      (cond ((eq ytr-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
+            ((eq ytr-make-new-comment-behavior 'link)
+             (ytr-remove-all-but-heading)
+             (insert (format "%s#%s\n" issue-id new-node-id)))
+            ((eq ytr-make-new-comment-behavior 'fetch)
+             (kill-region (point-min) (point-max))
+             (ytr-insert-remote-comment issue-id new-node-id curlevel))))
+    (widen)
+    (ytr-shortcode-buttonize-buffer)))
 
 (defun ytr-commit-update-node ()
   "Commit the buffer to youtrack to update a node"
   (interactive)
-  (cl-case ytr-buffer-node-type
-    (description (ytr-send-issue-alist ytr-buffer-issue-id `((description . ,(buffer-string)))))
-    (comment (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
-    (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
-  (set-window-configuration ytr-buffer-wconf)
-  (message "Node successfully updated")
-  (ytr-fetch-remote-node))
+  (let ((issue-id ytr-buffer-issue-id)
+        (node-id ytr-buffer-node-id)
+        (node-type ytr-buffer-node-type))
+   (cl-case ytr-buffer-node-type
+     (description (ytr-send-issue-alist ytr-buffer-issue-id `((description . ,(buffer-string)))))
+     (comment (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
+     (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
+   (set-window-configuration ytr-buffer-wconf)
+   (message "Node successfully updated")
+   (ytr-send-attachments-action (cons issue-id (when (eq node-type 'comment) node-id)))
+   (ytr-fetch-remote-node)))
 
 (defun ytr-new-comment-editable ()
   "Send the current subtree or region as comment to a ticket"
@@ -774,14 +780,21 @@
             issues-alist)
     (switch-to-buffer bufname)))
 
-(defun ytr-send-node-attachments ()
-  "Send the attachments at node to issue and remove them locally (will ask)."
-  (interactive)
-  (let* ((issue-node-ids (ytr-guess-or-read-shortcode-and-comment-id)))
-    (ytr-send-attachments (mapcar (lambda (filename)
-                                    (file-name-concat (expand-file-name (org-attach-dir)) filename))
-                                  (org-attach-file-list (org-attach-dir)))
-                          (car issue-node-ids) (cdr issue-node-ids))))
+(defun ytr-send-attachments-action (issue-node-ids)
+  "Send the attachments at org heading to issue or node and remove them locally (will ask)."
+  (when (org-attach-file-list (org-attach-dir))
+    (let* ((paths (mapcar (lambda (filename)
+                            (file-name-concat (expand-file-name (org-attach-dir)) filename))
+                          (org-attach-file-list (org-attach-dir))))
+           (size (apply '+ (mapcar (lambda (path) (nth 7 (file-attributes path))) paths))))
+      (if (y-or-n-p (format "Upload %s files with total size %s? " (length paths) (file-size-human-readable size)))
+          (progn
+            (ytr-send-as-attachments paths (car issue-node-ids) (cdr issue-node-ids))
+            (when (y-or-n-p "Delete attachments after uploading? ")
+              (org-attach-delete-all t)
+              (message "Attachments deleted.")))
+        (message "Canceled by user.")))))
+
 ;;;; preview
 (defconst ytr-sneak-field-created
   '("created: %s" . (lambda (issue-alist) (format-time-string "%Y-%m-%d %H:%M" (/ (alist-get 'created issue-alist) 1000))))
@@ -981,6 +994,7 @@
 (ytr-define-action "copy-url" 'ytr-copy-url-action)
 (ytr-define-action "org-link-heading" 'ytr-org-link-heading-action)
 (ytr-define-action "org-capture" 'ytr-capture-action)
+(ytr-define-action "send-attachments" 'ytr-send-attachments-action)
 
 ;;;; Issue buttons
 
