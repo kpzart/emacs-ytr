@@ -133,6 +133,18 @@
        ((length mine) :format "Mine: %s" :truncate .2 :face 'marginalia-type)
        )))
 
+(defconst ytr-issue-shortcode-pattern "[A-z]+-[0-9]+")
+(defconst ytr-comment-shortcode-pattern "#\\([0-9-]+\\)")
+(defconst ytr-issue-comment-shortcode-pattern (format "\\(%s\\)\\(?:%s\\)?" ytr-issue-shortcode-pattern ytr-comment-shortcode-pattern))
+
+(defun ytr-delim-pattern (pattern)
+  "Add string begin and string end delimiters to pattern"
+  (format "^%s$" pattern))
+
+(defun ytr-surrounded-pattern (pattern)
+  "Add surroundings to pattern"
+  (format "\\([^A-z0-9-#]\\)\\(%s\\)\\([^A-z0-9-#]\\)" pattern))
+
 (defun ytr-read-shortcode-annotated ()
   "Return a shortcode from a query"
   (interactive)
@@ -209,8 +221,8 @@
 
 (defun ytr-parse-shortcode-and-node-id (candidate)
   "Parse string for and issue shortcode and a comment id if present"
-  (if (string-match "^\\([A-z]+-[0-9]+\\)\\(#\\([0-9-]+\\)\\)?$" candidate)
-      (cons (match-string 1 candidate) (match-string 3 candidate))
+  (if (string-match (ytr-delim-pattern ytr-issue-comment-shortcode-pattern) candidate)
+      (cons (match-string 1 candidate) (match-string 2 candidate))
     nil))
 
 (defun ytr-shortcode-and-comment-id-from-point ()
@@ -233,7 +245,7 @@
 (defun ytr-shortcode-from-branch ()
   "Return the shortcode from the name of the current git branch"
   (let ((branch-name (shell-command-to-string "git rev-parse --abbrev-ref HEAD")))
-    (if (string-match "^\\([A-z]+/\\)?\\([A-z]+-[0-9]+\\)[-_].*$" branch-name)
+    (if (string-match (format "^\\([A-z]+/\\)?\\(%s\\)[-_].*$" ytr-issue-shortcode-pattern) branch-name)
         (match-string 2 branch-name))))
 
 (defun ytr-guess-shortcode ()
@@ -296,7 +308,7 @@
            (end (progn (skip-chars-forward "[:alnum:]-#") (point)))
            (str (buffer-substring-no-properties start end)))
       (save-match-data
-        (when (string-match-p "^[A-z]+-[0-9]+\\(#[0-9-]+\\)?$" str)
+        (when (string-match-p (ytr-delim-pattern ytr-issue-comment-shortcode-pattern) str)
           `(ytr-shortcode
             ,str
             ,start . ,end))))))
@@ -636,7 +648,7 @@
         (issue-id (ytr-guess-or-read-shortcode))
         (curlevel (ytr-max-heading-level)))
     (org-gfm-export-as-markdown nil nil)
-    (replace-regexp "^#" "##" nil (point-min) (point-max))
+    (replace-regexp-in-region "^#" "##" (point-min) (point-max))
     (whitespace-cleanup)
     (ytr-commit-new-comment-mode)
     (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
@@ -1011,8 +1023,8 @@
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    (while (re-search-forward "[^A-z0-9-]\\([A-z]+-[0-9]+\\(#[0-9-]+\\)?\\)[^A-z0-9-]" nil t)
-      (make-button (match-beginning 1) (match-end 1) :type 'shortcode-button))))
+    (while (re-search-forward (ytr-surrounded-pattern ytr-issue-comment-shortcode-pattern) nil t)
+      (make-button (match-beginning 2) (match-end 2) :type 'shortcode-button))))
 
 (add-hook 'org-mode-hook 'ytr-shortcode-buttonize-buffer)
 
