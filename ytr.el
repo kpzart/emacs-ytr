@@ -136,6 +136,7 @@
 (defconst ytr-issue-shortcode-pattern "[A-z]+-[0-9]+")
 (defconst ytr-comment-shortcode-pattern "#\\([0-9-]+\\)")
 (defconst ytr-issue-comment-shortcode-pattern (format "\\(%s\\)\\(?:%s\\)?" ytr-issue-shortcode-pattern ytr-comment-shortcode-pattern))
+(defconst ytr-issue-mandatory-comment-shortcode-pattern (format "\\(%s\\)%s" ytr-issue-shortcode-pattern ytr-comment-shortcode-pattern))
 
 (defun ytr-delim-pattern (pattern)
   "Add string begin and string end delimiters to pattern"
@@ -217,7 +218,7 @@
   (funcall ytr-read-shortcode-function))
 
 ;;;; recognize shortcode
-(add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9A-z-#" "" ""))
+(add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9A-z#-" "[" "]"))
 
 (defun ytr-parse-shortcode-and-node-id (candidate)
   "Parse string for and issue shortcode and a comment id if present"
@@ -650,6 +651,8 @@
     (org-gfm-export-as-markdown nil nil)
     (replace-regexp-in-region "^#" "##" (point-min) (point-max))
     (whitespace-cleanup)
+    (replace-regexp-in-region (format "\\([^[#A-z0-9-]\\|^\\)%s\\([^]#A-z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
+                              (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
     (ytr-commit-new-comment-mode)
     (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
     (setq-local ytr-buffer-wconf wconf
@@ -708,7 +711,8 @@
     (org-gfm-export-as-markdown nil t)
     (replace-regexp-in-region "^#" "##" (point-min) (point-max))
     (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "![](\\1)" (point-min) (point-max))
-
+    (replace-regexp-in-region (format "\\([^[#A-z0-9-]\\|^\\)%s\\([^]#A-z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
+                              (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
     (whitespace-cleanup)
     (ytr-commit-update-node-mode)
     (message "Update %s with ID %s on issue %s" type node-id issue-id)
