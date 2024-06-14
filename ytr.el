@@ -794,7 +794,7 @@
 
 (defun ytr-send-attachments-action (issue-node-ids)
   "Send the attachments at org heading to issue or node and remove them locally (will ask)."
-  (when (org-attach-file-list (org-attach-dir))
+  (when (and (org-attach-dir) (org-attach-file-list (org-attach-dir)))
     (let* ((paths (mapcar (lambda (filename)
                             (file-name-concat (expand-file-name (org-attach-dir)) filename))
                           (org-attach-file-list (org-attach-dir))))
