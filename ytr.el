@@ -422,7 +422,7 @@
     (erase-buffer)
     (insert input)
     (shell-command-on-region (point-min) (point-max)
-                             (format "pandoc -f gfm -t org")
+                             (format "pandoc --wrap=preserve -f gfm -t org")
                              nil t "*ytr-convert-error*")
     (let ((inhibit-message t))
       (replace-string "☒" "[X]" t (point-min) (point-max))
