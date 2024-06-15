@@ -490,11 +490,12 @@
   (let-alist issue-alist
     (let ((bufname (format "*ytr-org-%s*" (downcase .idReadable))))
       (set-buffer (get-buffer-create bufname))
-      (erase-buffer)
-      (org-mode)
-      (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
-      (ytr-insert-issue-alist-as-org issue-alist)
-      (switch-to-buffer bufname))))
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (org-mode)
+        (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
+        (ytr-insert-issue-alist-as-org issue-alist)
+        (switch-to-buffer bufname)))))
 
 (defun ytr-max-heading-level ()
   "Determine the highest Heading in the buffer. Return nil if no heading found."
@@ -548,6 +549,7 @@
                     author))
     (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
     (org-set-property "YTR_ID" node-id)
+    (org-set-property "YTR_SHORTCODE" issue-id)
     (org-set-property "YTR_TYPE" (format "%s" type))
     (when content (insert (ytr-md-to-org content (+ 1 level))))
     (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
@@ -768,6 +770,7 @@
          (comment-id (cdr issue-node-ids)))
     (ytr-issue-alist-to-org-buffer (ytr-retrieve-issue-alist shortcode))
     (org-mode)
+    (read-only-mode 1)
     (ytr-shortcode-buttonize-buffer)
     (goto-char (point-min))
     (when comment-id
