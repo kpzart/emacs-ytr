@@ -964,9 +964,11 @@
 
 (defun ytr-capture-action (issue-comment-ids)
   "Capture a proxy org task that references an issue on ytr"
-  (setq ytr-summary (alist-get 'summary (ytr-retrieve-issue-alist (car issue-comment-ids))))
-  (org-capture nil ytr-capture-key)
-  (ytr-org-link-heading-action issue-comment-ids))
+  (let-alist (ytr-retrieve-issue-alist (car issue-comment-ids))
+    (setq ytr-summary .summary)
+    (setq ytr-shortcode .idReadable)
+    (org-capture nil ytr-capture-key)
+    (ytr-org-link-heading-action issue-comment-ids)))
 
 ;;;; actions
 (defmacro ytr-define-dart-action (name action)
