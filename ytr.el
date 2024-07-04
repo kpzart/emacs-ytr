@@ -562,8 +562,10 @@
               (let-alist attachment-alist
                 (replace-string-in-region (format "[[file:%s]]" .name)
                                           (format "[[%s%s&forceDownload=true&ytr_name=%s][%s]]" ytr-baseurl .url .name .name)
-                                          (point-min)
-                                          (point-max))))
+                                          (point-min) (point-max))
+                (replace-regexp-in-region (format "\\[\\[file:%s]\\[\\(.*\\)]]" .name)
+                                          (format "[[%s%s&forceDownload=true&ytr_name=%s][\\1]]" ytr-baseurl .url .name)
+                                          (point-min) (point-max))))
             attachments)))
 
 (defun ytr-find-node ()
