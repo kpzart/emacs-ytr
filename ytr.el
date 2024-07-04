@@ -774,7 +774,7 @@
     (ytr-shortcode-buttonize-buffer)
     (goto-char (point-min))
     (when comment-id
-      (search-forward comment-id nil t)
+      (search-forward-regexp (format ":YTR_ID: *%s" comment-id) nil t)
       (org-back-to-heading))))
 
 (defun ytr-org-link-heading-action (issue-comment-ids)
