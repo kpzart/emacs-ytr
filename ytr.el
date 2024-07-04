@@ -348,7 +348,7 @@
                      ))
          (response-status (request-response-status-code response))
          (response-data (request-response-data response)))
-    (if (or (< response-status 200) (> response-status 299))
+    (if (or (not response-status) (< response-status 200) (> response-status 299))
         (user-error "Request failed with status %s and message %s" response-status response)
       response-data)))
 
