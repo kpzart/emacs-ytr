@@ -754,15 +754,13 @@
          (issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
          (node-id (org-entry-get (point) "YTR_ID" t))
          (curlevel (org-current-level)))
-    (let ((inhibit-message t))
-      (org-cut-subtree))
-    (condition-case err
+    (let ((inhibit-read-only t)
+          (inhibit-message t))
+        (org-cut-subtree)
         (cl-case type
           (description (ytr-insert-remote-issue-description issue-id node-id curlevel))
           (comment (ytr-insert-remote-comment issue-id node-id curlevel))
-          (t (user-error "Bad node type %s" type)))
-      (error (undo)
-             (signal (car err) (cdr err))))))
+          (t (user-error "Bad node type %s" type))))))
 
 (defun ytr-org-action (issue-node-ids)
   ""
