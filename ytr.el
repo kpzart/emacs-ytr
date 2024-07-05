@@ -654,7 +654,7 @@
         (curlevel (ytr-max-heading-level))
         (attach-dir (org-attach-dir)))
     (org-gfm-export-as-markdown nil nil)
-    (replace-regexp-in-region "^#" "##" (point-min) (point-max))
+    (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
     (whitespace-cleanup)
     (replace-regexp-in-region (format "\\([^[#A-z0-9-]\\|^\\)%s\\([^]#A-z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
                               (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
@@ -696,6 +696,8 @@
     (insert heading)
     (insert "/(Issue created from deleted content)/\n\n")))
 
+(defcustom ytr-export-base-heading-level 2 "Highest Heading Level in exported markdown" :type 'integer :group 'ytr)
+
 (defun ytr-update-remote-node-editable ()
   "Update a node on remote side after editing locally"
   (interactive)
@@ -719,7 +721,7 @@
         (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
 
     (org-gfm-export-as-markdown nil t)
-    (replace-regexp-in-region "^#" "##" (point-min) (point-max))
+    (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
     (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\(?:png\\|jpeg\\|jpg\\)\\))" ytr-baseurl) "![](\\1)" (point-min) (point-max))
     (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "[\\1](\\2)" (point-min) (point-max))
     (replace-regexp-in-region (format "\\([^[#A-z0-9-]\\|^\\)%s\\([^]#A-z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
