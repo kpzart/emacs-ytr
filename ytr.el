@@ -715,7 +715,7 @@
          (remote-hash (if content (sha1 content) ""))
          (local-hash (org-entry-get (point) "YTR_CONTENT_HASH" t))
          (wconf (current-window-configuration))
-         (attach-dir (org-attach-dir)))
+         (attach-dir (or (org-attach-dir) "")))
     (ytr-add-issue-to-history issue-id)
     (when (not (string= local-hash remote-hash))
         (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
