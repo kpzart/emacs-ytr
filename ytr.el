@@ -502,7 +502,7 @@
   (save-excursion
     (goto-char (point-min))
     (let ((lowest-level 6)) ;; Set initial lowest level to the maximum heading level (e.g., 6 for `org-mode`)
-      (while (re-search-forward "^\\(\\*+\\)" nil t)
+      (while (re-search-forward "^\\(\\*+\\) " nil t)
         (setq lowest-level (min lowest-level (length (match-string 1)))))
       lowest-level)))
 
