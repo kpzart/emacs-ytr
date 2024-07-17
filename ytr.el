@@ -900,7 +900,7 @@
          (comment-id (cdr issue-node-ids))
          (issue-alist (ytr-retrieve-issue-alist shortcode)))
     (ytr-sneak-window-issue issue-alist)
-    (ytr-sneak-window-comment issue-alist comment-id)))
+    (when comment-id (ytr-sneak-window-comment issue-alist comment-id))))
 
 ;;;; Copy URL
 
