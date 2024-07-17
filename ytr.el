@@ -133,7 +133,7 @@
        ((length mine) :format "Mine: %s" :truncate .2 :face 'marginalia-type)
        )))
 
-(defconst ytr-issue-shortcode-pattern "[A-z]+-[0-9]+")
+(defconst ytr-issue-shortcode-pattern "[a-zA-Z]+-[0-9]+")
 (defconst ytr-comment-shortcode-pattern "#\\([0-9-]+\\)")
 (defconst ytr-issue-comment-shortcode-pattern (format "\\(%s\\)\\(?:%s\\)?" ytr-issue-shortcode-pattern ytr-comment-shortcode-pattern))
 (defconst ytr-issue-mandatory-comment-shortcode-pattern (format "\\(%s\\)%s" ytr-issue-shortcode-pattern ytr-comment-shortcode-pattern))
@@ -144,13 +144,13 @@
 
 (defun ytr-surrounded-pattern (pattern)
   "Add surroundings to pattern"
-  (format "\\([^A-z0-9-#]\\)\\(%s\\)\\([^A-z0-9-#]\\)" pattern))
+  (format "\\([^a-zA-Z0-9-#]\\)\\(%s\\)\\([^a-zA-Z0-9-#]\\)" pattern))
 
 (defun ytr-read-shortcode-annotated ()
   "Return a shortcode from a query"
   (interactive)
   (let ((query (completing-read "Query: " ytr-queries nil nil)))
-    (if (string-match-p "^[A-z]+-[0-9]+$" query) query ;; if query is already a shortcode
+    (if (string-match-p "^[a-zA-Z]+-[0-9]+$" query) query ;; if query is already a shortcode
       (let ((issues-alist (ytr-retrieve-query-issues-alist query)))
         (if (length> issues-alist 0)
             (ytr-completing-read-categorised "Issue: "
@@ -218,7 +218,7 @@
   (funcall ytr-read-shortcode-function))
 
 ;;;; recognize shortcode
-(add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9A-z#-" "[" "]"))
+(add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9a-zA-Z#-" "" ""))
 
 (defun ytr-parse-shortcode-and-node-id (candidate)
   "Parse string for and issue shortcode and a comment id if present"
@@ -246,7 +246,7 @@
 (defun ytr-shortcode-from-branch ()
   "Return the shortcode from the name of the current git branch"
   (let ((branch-name (shell-command-to-string "git rev-parse --abbrev-ref HEAD")))
-    (if (string-match (format "^\\([A-z]+/\\)?\\(%s\\)[-_].*$" ytr-issue-shortcode-pattern) branch-name)
+    (if (string-match (format "^\\([a-zA-Z]+/\\)?\\(%s\\)[-_].*$" ytr-issue-shortcode-pattern) branch-name)
         (match-string 2 branch-name))))
 
 (defun ytr-guess-shortcode ()
@@ -656,7 +656,7 @@
     (org-gfm-export-as-markdown nil nil)
     (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
     (whitespace-cleanup)
-    (replace-regexp-in-region (format "\\([^[#A-z0-9-]\\|^\\)%s\\([^]#A-z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
+    (replace-regexp-in-region (format "\\([^[#a-zA-Z0-9-]\\|^\\)%s\\([^]#a-zA-Z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
                               (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
 
     (replace-regexp-in-region (format "](file://%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
@@ -724,7 +724,7 @@
     (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
     (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\(?:png\\|jpeg\\|jpg\\)\\))" ytr-baseurl) "![](\\1)" (point-min) (point-max))
     (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "[\\1](\\2)" (point-min) (point-max))
-    (replace-regexp-in-region (format "\\([^[#A-z0-9-]\\|^\\)%s\\([^]#A-z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
+    (replace-regexp-in-region (format "\\([^[#a-zA-Z0-9-]\\|^\\)%s\\([^]#a-zA-Z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
                               (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
     (replace-regexp-in-region (format "](file://%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
     (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
