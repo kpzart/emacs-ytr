@@ -991,7 +991,7 @@
 (defmacro ytr-define-embark-action (name action)
   `(defun ,(intern (format "ytr-embark-%s" name)) (cand)
      ,(format "Like ytr-dart-%s but cand consists of shortcode and summary" name)
-     (funcall ,action (cons (car (split-string cand ":")) nil))))
+     (funcall ,action (ytr-parse-shortcode-and-node-id (car (split-string cand ":"))))))
 
 (defmacro ytr-define-base-action (name action)
   `(defun ,(intern (format "ytr-%s" name)) (shortcode)
