@@ -234,14 +234,10 @@
   "Return the shortcode at point or nil if there is none"
   (car (ytr-shortcode-and-comment-id-from-point)))
 
-(defun ytr-shortcode-from-org-property ()
+(defun ytr-shortcode-and-comment-id-from-org-property ()
   "Return the shortcode defined by an org property YTR_SHORTCODE or nil"
-  (org-entry-get (point) "YTR_SHORTCODE" t))
-
-(defun ytr-comment-id-from-org-property ()
-  "Return the comment id defined by an org property YTR_ID or nil. Returns also nil if this is not a comment"
-  (if (string= "comment" (org-entry-get (point) "YTR_TYPE" t))
-      (org-entry-get (point) "YTR_ID" t)))
+  (let ((shortcode (org-entry-get (point) "YTR_SHORTCODE" t)))
+    (when shortcode (ytr-parse-shortcode-and-node-id shortcode))))
 
 (defun ytr-shortcode-from-branch ()
   "Return the shortcode from the name of the current git branch"
@@ -254,8 +250,8 @@
   (interactive)
   (let ((issue (ytr-shortcode-from-point)))
     (if issue issue
-      (let ((issue (ytr-shortcode-from-org-property)))
-        (if issue issue
+      (let ((issue (ytr-shortcode-and-comment-id-from-org-property)))
+        (if issue (car issue)
           (let ((issue (ytr-shortcode-from-branch)))
             (if issue issue nil)))))))
 
@@ -263,8 +259,8 @@
   "Return a cons cell from shortcode and comment id from current context."
   (let ((issue-comment-ids (ytr-shortcode-and-comment-id-from-point)))
     (if issue-comment-ids issue-comment-ids
-      (let ((issue (ytr-shortcode-from-org-property)))
-        (if issue (cons issue (ytr-comment-id-from-org-property))
+      (let ((issue (ytr-shortcode-and-comment-id-from-org-property)))
+        (if issue issue
           (let ((issue (ytr-shortcode-from-branch)))
             (if issue (cons issue nil) nil)))))))
 
@@ -442,7 +438,6 @@
   (let-alist issue-alist
    (insert (concat "* ".idReadable ": " .summary "\n\n"))
    (org-set-property "YTR_SHORTCODE" .idReadable)
-   (org-set-property "YTR_ID" .id)
    (insert "** Links\n\n")
    (mapcar (lambda (link-alist)
              (let-alist link-alist
@@ -548,8 +543,7 @@
                     (ytr-capitalize-first-char (format "%s" type))
                     author))
     (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
-    (org-set-property "YTR_ID" node-id)
-    (org-set-property "YTR_SHORTCODE" issue-id)
+    (org-set-property "YTR_SHORTCODE" (format "%s#%s" issue-id node-id))
     (org-set-property "YTR_TYPE" (format "%s" type))
     (when content (insert (ytr-md-to-org content (+ 1 level))))
     (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
@@ -707,8 +701,9 @@
                  (if (string= type-str "comment")
                      'comment
                    (user-error (format "Unknown node type: %s" type-str)))))
-         (issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
-         (node-id (org-entry-get (point) "YTR_ID" t))
+         (issue-node-ids (ytr-shortcode-and-comment-id-from-org-property))
+         (issue-id (car issue-node-ids))
+         (node-id (cdr issue-node-ids))
          (content (cl-case type
                     (description (alist-get 'description (ytr-retrieve-issue-alist issue-id)))
                     (comment (alist-get 'text (ytr-retrieve-issue-comment-alist issue-id node-id)))))
@@ -730,7 +725,7 @@
     (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
     (whitespace-cleanup)
     (ytr-commit-update-node-mode)
-    (message "Update %s with ID %s on issue %s" type node-id issue-id)
+    (message "Update %s%s on issue %s" type (if (eq type 'comment) (format " with ID %s" node-id) "") issue-id)
     (setq-local ytr-buffer-wconf wconf
                 ytr-buffer-commit-type 'update
                 ytr-buffer-node-type type
@@ -764,8 +759,9 @@
                  (if (string= type-str "comment")
                      'comment
                    (user-error "Cannot fetch node of type %s" type-str))))
-         (issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
-         (node-id (org-entry-get (point) "YTR_ID" t))
+         (issue-node-ids (ytr-shortcode-and-comment-id-from-org-property))
+         (issue-id (car issue-node-ids))
+         (node-id (cdr issue-node-ids))
          (curlevel (org-current-level)))
     (let ((inhibit-read-only t)
           (inhibit-message t))
@@ -785,7 +781,7 @@
     (ytr-shortcode-buttonize-buffer)
     (goto-char (point-min))
     (when comment-id
-      (search-forward-regexp (format ":YTR_ID: *%s" comment-id) nil t)
+      (search-forward-regexp (format ":YTR_SHORTCODE: *%s#%s" shortcode comment-id) nil t)
       (org-back-to-heading))))
 
 (defun ytr-org-link-heading-action (issue-comment-ids)
