@@ -544,7 +544,7 @@
                     author))
     (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
     (org-set-property "YTR_SHORTCODE" (format "%s#%s" issue-id node-id))
-    (org-set-property "YTR_TYPE" (format "%s" type))
+    (org-set-property "YTR_NODE_TYPE" (format "%s" type))
     (when content (insert (ytr-md-to-org content (+ 1 level))))
     (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
       (org-set-property "YTR_SHORTCODE" issue-id))
@@ -563,15 +563,13 @@
             attachments)))
 
 (defun ytr-find-node ()
-  "Find the parent heading with a YTR_TYPE property, sets the point and returns the type. If property is not found in buffer returns nil."
+  "Find the parent heading with a YTR_NODE_TYPE property, sets the point and returns the type. If property is not found in buffer returns nil."
   (when (or (org-at-heading-p) (org-back-to-heading))
-    (let ((type (org-entry-get (point) "YTR_TYPE")))
+    (let ((type (org-entry-get (point) "YTR_NODE_TYPE")))
       (if (or (string= type "comment") (string= type "description"))
-          type
-        (if (org-up-heading-safe)
-            (ytr-find-node)
-          nil))))
-  )
+          (intern type)
+        (when (org-up-heading-safe)
+            (ytr-find-node))))))
 
 ;;;; org interactive
 (defvar-keymap ytr-commit-new-comment-mode-map "C-c C-c" #'ytr-commit-new-comment "C-c C-k" #'ytr-cancel-commit)
@@ -695,12 +693,7 @@
 (defun ytr-update-remote-node-editable ()
   "Update a node on remote side after editing locally"
   (interactive)
-  (let* ((type-str (ytr-find-node))
-         (type (if (string= type-str "description")
-                   'description
-                 (if (string= type-str "comment")
-                     'comment
-                   (user-error (format "Unknown node type: %s" type-str)))))
+  (let* ((type (ytr-find-node))
          (issue-node-ids (ytr-shortcode-and-comment-id-from-org-property))
          (issue-id (car issue-node-ids))
          (node-id (cdr issue-node-ids))
@@ -711,6 +704,8 @@
          (local-hash (org-entry-get (point) "YTR_CONTENT_HASH" t))
          (wconf (current-window-configuration))
          (attach-dir (or (org-attach-dir) "")))
+    (unless (member type '(comment description))
+        (user-error (format "Unknown node type: %s" type)))
     (ytr-add-issue-to-history issue-id)
     (when (not (string= local-hash remote-hash))
         (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
@@ -735,7 +730,7 @@
 (defun ytr-send-node ()
   "Create a new comment or update the node, depending on context."
   (interactive)
-  (if (org-entry-get (point) "YTR_TYPE" t)
+  (if (org-entry-get (point) "YTR_NODE_TYPE" t)
       (ytr-update-remote-node-editable)
     (ytr-new-comment-editable)))
 
@@ -753,16 +748,13 @@
 (defun ytr-fetch-remote-node ()
   "Update a local node withs its remote content"
   (interactive)
-  (let* ((type-str (ytr-find-node))
-         (type (if (string= type-str "description")
-                   'description
-                 (if (string= type-str "comment")
-                     'comment
-                   (user-error "Cannot fetch node of type %s" type-str))))
+  (let* ((type (ytr-find-node))
          (issue-node-ids (ytr-shortcode-and-comment-id-from-org-property))
          (issue-id (car issue-node-ids))
          (node-id (cdr issue-node-ids))
          (curlevel (org-current-level)))
+    (unless (member type '(comment description))
+      (user-error "Cannot fetch node of type %s" type))
     (let ((inhibit-read-only t)
           (inhibit-message t))
         (org-cut-subtree)
