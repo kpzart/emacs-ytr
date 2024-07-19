@@ -432,53 +432,55 @@
     (org-unindent-buffer)
     (buffer-string)))
 
-(defun ytr-insert-issue-alist-as-org (issue-alist)
+(defun ytr-insert-issue-alist-as-org (issue-alist level)
   "Insert the issue given by ISSUE-ALIST as org at point"
-  ;; title and description
   (let-alist issue-alist
-   (insert (concat "* ".idReadable ": " .summary "\n\n"))
-   (org-set-property "YTR_SHORTCODE" .idReadable)
-   (insert "** Links\n\n")
-   (mapcar (lambda (link-alist)
-             (let-alist link-alist
-               (unless (equal (length .issues) 0)
-                 (insert (format "*** %s\n\n" (cond ((string= .direction "BOTH") (alist-get 'sourceToTarget .linkType))
-                                                    ((string= .direction "INWARD") (alist-get 'targetToSource .linkType))
-                                                    ((string= .direction "OUTWARD") (alist-get 'sourceToTarget .linkType))
-                                                    (t (message "Unknown link direction: %s" .direction)))))
-                 (mapcar (lambda (issue-alist)
-                           (let-alist issue-alist
-                             (insert (format " - *%s*: %s\n" .idReadable .summary))))
-                         .issues)
-                 (insert "\n")
-                 )
-               ))
-           .links)
-   (unless (eq .attachments '[])
-     (insert "** Attachments\n\n")
-     (mapcar (lambda (attachment-alist)
-               (let-alist attachment-alist
-                 (insert (format "- [[%s%s][%s]] %s %s (%s)\n"
-                                 ytr-baseurl
-                                 .url
-                                 .name
-                                 .mimeType
-                                 (file-size-human-readable .size)
-                                 (if .comment
-                                     (format "Comment %s" (alist-get 'id .comment))
-                                   "Issue")))))
-             .attachments)
-     (insert "\n"))
-   ;; do the description
-   (ytr-org-insert-node .description 2 'description .idReadable .id (alist-get 'fullName .reporter) .created .attachments)
-   ;; do the comments
-   (let ((shortcode .idReadable))
-     (mapcar (lambda (comment-alist)
-               (let-alist comment-alist
-                 (ytr-org-insert-node .text 2 'comment shortcode .id (alist-get 'fullName .author) .created .attachments)))
-             .comments))
-   ;; postprocess
-   (org-unindent-buffer)))
+    (insert (format "%s %s: %s\n\n" (make-string level ?*) .idReadable .summary))
+    (open-line 1)  ;; need this to ensure props go to correct heading
+    (org-set-property "YTR_SHORTCODE" .idReadable)
+    (org-set-property "YTR_NODE_TYPE" "issue")
+    (kill-whole-line)  ;; kill line we just opened
+    (insert (format "%s Links\n\n" (make-string (+ 1 level) ?*)))
+    (mapcar (lambda (link-alist)
+              (let-alist link-alist
+                (unless (equal (length .issues) 0)
+                  (insert (format "%s %s\n\n"
+                                  (make-string (+ 2 level) ?*)
+                                  (cond ((string= .direction "BOTH") (alist-get 'sourceToTarget .linkType))
+                                        ((string= .direction "INWARD") (alist-get 'targetToSource .linkType))
+                                        ((string= .direction "OUTWARD") (alist-get 'sourceToTarget .linkType))
+                                        (t (message "Unknown link direction: %s" .direction)))))
+                  (mapcar (lambda (issue-alist)
+                            (let-alist issue-alist
+                              (insert (format " - *%s*: %s\n" .idReadable .summary))))
+                          .issues)
+                  (insert "\n"))))
+            .links)
+    (unless (eq .attachments '[])
+      (insert (format "%s Attachments\n\n" (make-string (+ 1 level) ?*)))
+      (mapcar (lambda (attachment-alist)
+                (let-alist attachment-alist
+                  (insert (format "- [[%s%s][%s]] %s %s (%s)\n"
+                                  ytr-baseurl
+                                  .url
+                                  .name
+                                  .mimeType
+                                  (file-size-human-readable .size)
+                                  (if .comment
+                                      (format "Comment %s" (alist-get 'id .comment))
+                                    "Issue")))))
+              .attachments)
+      (insert "\n"))
+    ;; do the description
+    (ytr-org-insert-node .description (+ 1 level) 'description .idReadable .id (alist-get 'fullName .reporter) .created .attachments)
+    ;; do the comments
+    (let ((shortcode .idReadable))
+      (mapcar (lambda (comment-alist)
+                (let-alist comment-alist
+                  (ytr-org-insert-node .text (+ 1 level) 'comment shortcode .id (alist-get 'fullName .author) .created .attachments)))
+              .comments))
+    ;; postprocess
+    (org-unindent-buffer)))
 
 (defun ytr-issue-alist-to-org-buffer (issue-alist)
   "Convert an alist of markdown code into an org buffer with proper headings"
@@ -489,7 +491,7 @@
         (erase-buffer)
         (org-mode)
         (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
-        (ytr-insert-issue-alist-as-org issue-alist)
+        (ytr-insert-issue-alist-as-org issue-alist 1)
         (switch-to-buffer bufname)))))
 
 (defun ytr-max-heading-level ()
@@ -536,7 +538,7 @@
 (defun ytr-org-insert-node (content level type issue-id node-id author created attachments)
   "Insert a node at point, level is that of the node, type is generic, author is a string, created is a long value"
   (let ((start (point)))
-    (open-line 1)
+    (open-line 1)  ;; need this to ensure props go to correct heading
     (insert (format "%s %s %s by %s\n\n"
                     (make-string level ?*)
                     (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
@@ -545,9 +547,10 @@
     (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
     (org-set-property "YTR_SHORTCODE" (format "%s#%s" issue-id node-id))
     (org-set-property "YTR_NODE_TYPE" (format "%s" type))
+    (kill-whole-line)  ;; kill line we just opened
     (when content (insert (ytr-md-to-org content (+ 1 level))))
-    (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))
-      (org-set-property "YTR_SHORTCODE" issue-id))
+    ;; (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))  ;; dont see the sense of those lines, keep a while commented
+    ;;   (org-set-property "YTR_SHORTCODE" issue-id))
     (when (/= (length attachments) 0)
       (save-excursion
         (goto-char start)
@@ -566,10 +569,8 @@
   "Find the parent heading with a YTR_NODE_TYPE property, sets the point and returns the type. If property is not found in buffer returns nil."
   (when (or (org-at-heading-p) (org-back-to-heading))
     (let ((type (org-entry-get (point) "YTR_NODE_TYPE")))
-      (if (or (string= type "comment") (string= type "description"))
-          (intern type)
-        (when (org-up-heading-safe)
-            (ytr-find-node))))))
+      (if type (intern type)
+        (when (org-up-heading-safe) (ytr-find-node))))))
 
 ;;;; org interactive
 (defvar-keymap ytr-commit-new-comment-mode-map "C-c C-c" #'ytr-commit-new-comment "C-c C-k" #'ytr-cancel-commit)
@@ -693,19 +694,18 @@
 (defun ytr-update-remote-node-editable ()
   "Update a node on remote side after editing locally"
   (interactive)
-  (let* ((type (ytr-find-node))
+  (let* ((type (or (ytr-find-node) (user-error "Could not find a node to update")))
          (issue-node-ids (ytr-shortcode-and-comment-id-from-org-property))
          (issue-id (car issue-node-ids))
          (node-id (cdr issue-node-ids))
          (content (cl-case type
                     (description (alist-get 'description (ytr-retrieve-issue-alist issue-id)))
-                    (comment (alist-get 'text (ytr-retrieve-issue-comment-alist issue-id node-id)))))
+                    (comment (alist-get 'text (ytr-retrieve-issue-comment-alist issue-id node-id)))
+                    (t (user-error (format "Unknown node type: %s" type)))))
          (remote-hash (if content (sha1 content) ""))
          (local-hash (org-entry-get (point) "YTR_CONTENT_HASH" t))
          (wconf (current-window-configuration))
          (attach-dir (or (org-attach-dir) "")))
-    (unless (member type '(comment description))
-        (user-error (format "Unknown node type: %s" type)))
     (ytr-add-issue-to-history issue-id)
     (when (not (string= local-hash remote-hash))
         (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
@@ -743,25 +743,28 @@
 (defun ytr-insert-remote-comment (issue-id node-id level)
   "Insert a remote node in org format"
   (let-alist (ytr-retrieve-issue-comment-alist issue-id node-id)
-      (ytr-org-insert-node .text level 'comment issue-id node-id (alist-get 'fullName .author) .created .attachments)))
+    (ytr-org-insert-node .text level 'comment issue-id node-id (alist-get 'fullName .author) .created .attachments)))
+
+(defun ytr-insert-remote-issue (issue-id level)
+  "Insert a remote issue in org format"
+  (ytr-insert-issue-alist-as-org (ytr-retrieve-issue-alist issue-id) level))
 
 (defun ytr-fetch-remote-node ()
   "Update a local node withs its remote content"
   (interactive)
-  (let* ((type (ytr-find-node))
+  (let* ((type (or (ytr-find-node) (user-error "Could not find a node to fetch")))
          (issue-node-ids (ytr-shortcode-and-comment-id-from-org-property))
          (issue-id (car issue-node-ids))
          (node-id (cdr issue-node-ids))
          (curlevel (org-current-level)))
-    (unless (member type '(comment description))
-      (user-error "Cannot fetch node of type %s" type))
     (let ((inhibit-read-only t)
           (inhibit-message t))
-        (org-cut-subtree)
-        (cl-case type
-          (description (ytr-insert-remote-issue-description issue-id node-id curlevel))
-          (comment (ytr-insert-remote-comment issue-id node-id curlevel))
-          (t (user-error "Bad node type %s" type))))))
+      (org-cut-subtree)
+      (cl-case type
+        (description (ytr-insert-remote-issue-description issue-id node-id curlevel))
+        (comment (ytr-insert-remote-comment issue-id node-id curlevel))
+        (issue (ytr-insert-remote-issue issue-id curlevel))
+        (t (user-error "Bad node type %s" type))))))
 
 (defun ytr-org-action (issue-node-ids)
   ""
