@@ -645,7 +645,7 @@
   (let ((wconf (current-window-configuration))
         (issue-id (ytr-guess-or-read-shortcode))
         (curlevel (ytr-max-heading-level))
-        (attach-dir (org-attach-dir)))
+        (attach-dir (or (org-attach-dir) "")))
     (org-gfm-export-as-markdown nil nil)
     (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
     (whitespace-cleanup)
