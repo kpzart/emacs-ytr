@@ -491,6 +491,7 @@
         (erase-buffer)
         (org-mode)
         (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
+        (org-set-property "YTR_SHORTCODE" (format "%s" .idReadable))
         (ytr-insert-issue-alist-as-org issue-alist 1)
         (switch-to-buffer bufname)))))
 
