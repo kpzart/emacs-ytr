@@ -652,6 +652,8 @@
                             (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
   (replace-regexp-in-region (format "](file://%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
   (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
+  (replace-regexp-in-region ":.*:$" "" (point-min) (point-max))
+  (whitespace-cleanup)
   )
 
 (defun ytr-new-comment-editable ()
@@ -666,7 +668,6 @@
         (attach-dir (or (org-attach-dir) "")))
     (org-gfm-export-as-markdown nil nil)
     (ytr-perform-markdown-replacements)
-    (whitespace-cleanup)
     (ytr-commit-new-comment-mode)
     (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
     (setq-local ytr-buffer-wconf wconf
@@ -721,7 +722,6 @@
       (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
     (org-gfm-export-as-markdown nil t)
     (ytr-perform-markdown-replacements)
-    (whitespace-cleanup)
     (ytr-commit-update-node-mode)
     (message "Update %s%s on issue %s" type (if (eq type 'comment) (format " with ID %s" node-id) "") issue-id)
     (setq-local ytr-buffer-wconf wconf
