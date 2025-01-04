@@ -105,8 +105,8 @@
   "Annotate issue shortcode with some info"
   (let* ((shortcode (car (split-string cand ":")))
          (issue-alist (cl-find-if (lambda (elem)
-                                (string= (alist-get 'idReadable elem) shortcode))
-                              issues-alist))) ;; issues-alist comes from ytr-read-shortcode-annotated via lexical binding!
+                                    (string= (alist-get 'idReadable elem) shortcode))
+                                  issues-alist))) ;; issues-alist comes from ytr-read-shortcode-annotated via lexical binding!
     (let-alist issue-alist
       (marginalia--fields
        ;; (:left .summary :format " %s" :face 'marginalia-type)
@@ -126,12 +126,12 @@
          (unresolved (seq-drop-while (lambda (issue) (alist-get 'resolved issue)) total))
          (mine (seq-take-while (lambda (issue) (string= ytr-user-full-name (ytr-get-customField-value issue "Assignee"))) unresolved))
          ) ;; queries-alist comes from ytr-read-shortcode-annotated via lexical binding!
-      (marginalia--fields
-       (name :truncate .5 :face 'marginalia-documentation)
-       ((length total) :format "Total: %s" :truncate .2 :face 'marginalia-type)
-       ((length unresolved) :format "Open: %s" :truncate .2 :face 'marginalia-type)
-       ((length mine) :format "Mine: %s" :truncate .2 :face 'marginalia-type)
-       )))
+    (marginalia--fields
+     (name :truncate .5 :face 'marginalia-documentation)
+     ((length total) :format "Total: %s" :truncate .2 :face 'marginalia-type)
+     ((length unresolved) :format "Open: %s" :truncate .2 :face 'marginalia-type)
+     ((length mine) :format "Mine: %s" :truncate .2 :face 'marginalia-type)
+     )))
 
 (defconst ytr-issue-shortcode-pattern "[a-zA-Z]+-[0-9]+")
 (defconst ytr-comment-shortcode-pattern "#\\([0-9-]+\\)")
@@ -163,7 +163,7 @@
   ""
   (cl-case action
     (preview (ytr-sneak-window-issue
-               (cl-find-if (lambda (elem) (string= (alist-get 'idReadable elem) (car (split-string cand ":")))) issues-alist)))
+              (cl-find-if (lambda (elem) (string= (alist-get 'idReadable elem) (car (split-string cand ":")))) issues-alist)))
     (exit (quit-window))))
 
 (defun ytr-read-shortcode-from-query-consult (query)
@@ -322,7 +322,7 @@
 (defun ytr-add-issue-to-history (shortcode)
   (delete shortcode ytr-issue-history)
   (push shortcode ytr-issue-history)
-)
+  )
 
 ;;;; api
 (defun ytr-request (method url &optional body)
@@ -422,7 +422,7 @@
                              nil t "*ytr-convert-error*")
     (let ((inhibit-message t))
       (replace-string "☒" "[X]" t (point-min) (point-max))
-     (replace-string "☐" "[ ]" t (point-min) (point-max)))
+      (replace-string "☐" "[ ]" t (point-min) (point-max)))
     (goto-char (point-min))
     (flush-lines " *:[A-Z_]+:.*$") ; remove properties
     (goto-char (point-max))
@@ -586,9 +586,9 @@
   "Cancel committing something to youtrack"
   (interactive)
   (let ((node-type ytr-buffer-node-type))
-   (set-window-configuration ytr-buffer-wconf)
-   (cl-case node-type
-     (issue (undo))))
+    (set-window-configuration ytr-buffer-wconf)
+    (cl-case node-type
+      (issue (undo))))
   (widen))
 
 (defun ytr-remove-all-but-heading ()
@@ -628,14 +628,14 @@
   (let ((issue-id ytr-buffer-issue-id)
         (node-id ytr-buffer-node-id)
         (node-type ytr-buffer-node-type))
-   (cl-case ytr-buffer-node-type
-     (description (ytr-send-issue-alist ytr-buffer-issue-id `((description . ,(buffer-string)))))
-     (comment (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
-     (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
-   (set-window-configuration ytr-buffer-wconf)
-   (message "Node successfully updated")
-   (ytr-send-attachments-action (cons issue-id (when (eq node-type 'comment) node-id)))
-   (ytr-fetch-remote-node)))
+    (cl-case ytr-buffer-node-type
+      (description (ytr-send-issue-alist ytr-buffer-issue-id `((description . ,(buffer-string)))))
+      (comment (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
+      (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
+    (set-window-configuration ytr-buffer-wconf)
+    (message "Node successfully updated")
+    (ytr-send-attachments-action (cons issue-id (when (eq node-type 'comment) node-id)))
+    (ytr-fetch-remote-node)))
 
 (defun ytr-new-comment-editable ()
   "Send the current subtree or region as comment to a ticket"
@@ -709,7 +709,7 @@
          (attach-dir (or (org-attach-dir) "")))
     (ytr-add-issue-to-history issue-id)
     (when (not (string= local-hash remote-hash))
-        (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
+      (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
 
     (org-gfm-export-as-markdown nil t)
     (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
@@ -854,8 +854,8 @@
     (let-alist issue-alist
       (princ (format "%s: %s\n" .idReadable .summary))
       (princ (string-join (mapcar (lambda (field)
-                (format (car field) (funcall (cdr field) issue-alist)))
-        ytr-sneak-fields-issue) ", "))
+                                    (format (car field) (funcall (cdr field) issue-alist)))
+                                  ytr-sneak-fields-issue) ", "))
       (unless (= (length .attachments) 0)
         (princ "\nAttachments:")
         (mapcar (lambda (attachment-alist)
@@ -901,8 +901,8 @@
   (let* ((shortcode (car issue-node-ids))
          (comment-id (cdr issue-node-ids)))
     (if comment-id
-      (ytr-issue-comment-url shortcode comment-id)
-    (ytr-issue-url shortcode))))
+        (ytr-issue-comment-url shortcode comment-id)
+      (ytr-issue-url shortcode))))
 
 (defun ytr-copy-url-action (issue-node-ids)
   ""
@@ -1101,7 +1101,7 @@
                     :buffer "*helm ytr*")
             (message "No Issues found."))
           ))
-  ))
+      ))
 
 ;;;; provide
 (provide 'ytr)
