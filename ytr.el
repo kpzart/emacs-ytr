@@ -61,6 +61,8 @@
 
 (defcustom ytr-make-new-comment-behavior 'link "What should be done with the region from which a comment was created? One of 'kill, 'fetch (buggy), 'link or nil." :type '(choice (const kill) (const fetch) (const link)) :group 'ytr)
 
+(defcustom ytr-export-base-heading-level 2 "Highest Heading Level in exported markdown" :type 'integer :group 'ytr)
+
 (defvar ytr-issue-history '() "History for issues")
 (defvar ytr-query-history '() "History for query")
 
@@ -642,6 +644,16 @@
     (ytr-send-attachments-action (cons issue-id (when (eq node-type 'comment) node-id)))
     (ytr-fetch-remote-node)))
 
+(defun ytr-perform-markdown-replacements ()
+  (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
+  (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\(?:png\\|jpeg\\|jpg\\)\\))" ytr-baseurl) "![](\\1)" (point-min) (point-max))
+  (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "[\\1](\\2)" (point-min) (point-max))
+  (replace-regexp-in-region (format "\\([^[#a-zA-Z0-9-]\\|^\\)%s\\([^]#a-zA-Z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
+                            (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
+  (replace-regexp-in-region (format "](file://%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
+  (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
+  )
+
 (defun ytr-new-comment-editable ()
   "Send the current subtree or region as comment to a ticket"
   (interactive)
@@ -653,14 +665,8 @@
         (curlevel (ytr-max-heading-level))
         (attach-dir (or (org-attach-dir) "")))
     (org-gfm-export-as-markdown nil nil)
-    (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
+    (ytr-perform-markdown-replacements)
     (whitespace-cleanup)
-    (replace-regexp-in-region (format "\\([^[#a-zA-Z0-9-]\\|^\\)%s\\([^]#a-zA-Z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
-                              (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
-
-    (replace-regexp-in-region (format "](file://%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
-    (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
-
     (ytr-commit-new-comment-mode)
     (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
     (setq-local ytr-buffer-wconf wconf
@@ -695,8 +701,6 @@
     (insert heading)
     (insert "/(Issue created from deleted content)/\n\n")))
 
-(defcustom ytr-export-base-heading-level 2 "Highest Heading Level in exported markdown" :type 'integer :group 'ytr)
-
 (defun ytr-update-remote-node-editable ()
   "Update a node on remote side after editing locally"
   (interactive)
@@ -715,15 +719,8 @@
     (ytr-add-issue-to-history issue-id)
     (when (not (string= local-hash remote-hash))
       (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
-
     (org-gfm-export-as-markdown nil t)
-    (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
-    (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\(?:png\\|jpeg\\|jpg\\)\\))" ytr-baseurl) "![](\\1)" (point-min) (point-max))
-    (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "[\\1](\\2)" (point-min) (point-max))
-    (replace-regexp-in-region (format "\\([^[#a-zA-Z0-9-]\\|^\\)%s\\([^]#a-zA-Z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
-                              (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
-    (replace-regexp-in-region (format "](file://%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
-    (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
+    (ytr-perform-markdown-replacements)
     (whitespace-cleanup)
     (ytr-commit-update-node-mode)
     (message "Update %s%s on issue %s" type (if (eq type 'comment) (format " with ID %s" node-id) "") issue-id)
