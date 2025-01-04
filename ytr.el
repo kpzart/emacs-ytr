@@ -328,24 +328,29 @@
 (defun ytr-request (method url &optional body)
   "Generic request method."
   (let* ((request-timeout 10)
-         (response (request url
-                     :type method
-                     :headers `(("Authorization" . ,(concat "Bearer "
-                                                            (if (functionp ytr-access-token)
-                                                                (funcall ytr-access-token)
-                                                              (format "%s" ytr-access-token))))
-                                ("Accept" . "application/json")
-                                ("Content-Type" . "application/json"))
-                     :data body
-                     :sync t
-                     :parser 'json-read
-                     :complete (cl-function (lambda (&key response &allow-other-keys)
-                                              (when ytr-request-debug (message "Done: %s" (request-response-status-code response)))))
-                     ))
-         (response-status (request-response-status-code response))
-         (response-data (request-response-data response)))
+         (ytr-request-response))
+    (with-local-quit
+      (request url
+        :type method
+        :headers `(("Authorization" . ,(concat "Bearer "
+                                               (if (functionp ytr-access-token)
+                                                   (funcall ytr-access-token)
+                                                 (format "%s" ytr-access-token))))
+                   ("Accept" . "application/json")
+                   ("Content-Type" . "application/json"))
+        :data body
+        :sync t
+        :parser 'json-read
+        :complete (cl-function (lambda (&key response &allow-other-keys)
+                                 (when ytr-request-debug (message "Done: %s" (request-response-status-code response)))
+                                 (setq ytr-request-response response)))
+        ))
+    (cl-loop until ytr-request-response
+             do (sleep-for 0 100))
+    (setq response-status (request-response-status-code ytr-request-response))
+    (setq response-data (request-response-data ytr-request-response))
     (if (or (not response-status) (< response-status 200) (> response-status 299))
-        (user-error "Request failed with status %s and message %s" response-status response)
+        (user-error "Request failed with status %s and message %s" response-status ytr-request-response)
       response-data)))
 
 (defun ytr-request-upload (url &optional paths)
