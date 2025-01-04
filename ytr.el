@@ -345,8 +345,8 @@
                                  (when ytr-request-debug (message "Done: %s" (request-response-status-code response)))
                                  (setq ytr-request-response response)))
         ))
-    (cl-loop until ytr-request-response
-             do (sleep-for 0 100))
+    (while (not ytr-request-response)
+      (sleep-for 0 100))
     (setq response-status (request-response-status-code ytr-request-response))
     (setq response-data (request-response-data ytr-request-response))
     (if (or (not response-status) (< response-status 200) (> response-status 299))
