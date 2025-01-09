@@ -329,8 +329,10 @@
 ;;;; api
 (defun ytr-request (method url &optional body)
   "Generic request method."
-  (let* ((request-timeout 10)
-         (ytr-request-response))
+  (let ((request-timeout 20)
+        (ytr-request-response)
+        (counter 0)
+        (ytr-request-failure))
     (with-local-quit
       (request url
         :type method
@@ -341,19 +343,23 @@
                    ("Accept" . "application/json")
                    ("Content-Type" . "application/json"))
         :data body
-        :sync t
         :parser 'json-read
-        :complete (cl-function (lambda (&key response &allow-other-keys)
-                                 (when ytr-request-debug (message "Done: %s" (request-response-status-code response)))
-                                 (setq ytr-request-response response)))
-        ))
-    (while (not ytr-request-response)
-      (sleep-for 0 100))
-    (setq response-status (request-response-status-code ytr-request-response))
-    (setq response-data (request-response-data ytr-request-response))
-    (if (or (not response-status) (< response-status 200) (> response-status 299))
-        (user-error "Request failed with status %s and message %s" response-status ytr-request-response)
-      response-data)))
+        :success (cl-function (lambda (&rest args &key response &allow-other-keys)
+                                (setq ytr-request-response response)
+                                (when ytr-request-debug (message "Done: %s" (request-response-status-code response)))))
+        :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
+                              (setq ytr-request-response error-thrown)
+                              (message "Got error: %S" error-thrown)))))
+    (while (not (or ytr-request-failure ytr-request-response (> counter (+ request-timeout 1))))
+      (setq counter (+ 1 counter))
+      (sleep-for 0 1000))
+    (cond (ytr-request-failure (user-error "Request failed"))
+          (ytr-request-response (let ((response-status (request-response-status-code ytr-request-response))
+                                      (response-data (request-response-data ytr-request-response)))
+                                  (if (or (not response-status) (< response-status 200) (> response-status 299))
+                                      (user-error "Request failed with status %s and message %s" response-status ytr-request-response)
+                                    response-data)))
+          (t (user-error "Request did not return")))))
 
 (defun ytr-request-upload (url &optional paths)
   "Generic request method for uploading a list of files."
