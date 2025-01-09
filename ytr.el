@@ -630,8 +630,9 @@
              (ytr-remove-all-but-heading)
              (insert (format "%s#%s\n" issue-id new-node-id)))
             ((eq ytr-make-new-comment-behavior 'fetch)
-             (kill-region (point-min) (point-max))
-             (ytr-insert-remote-comment issue-id new-node-id curlevel))))
+             (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
+               (kill-region (point-min) (point-max))
+               (ytr-org-insert-node .text curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .attachments)))))
     (widen)
     (ytr-shortcode-buttonize-buffer)))
 
@@ -743,21 +744,6 @@
       (ytr-update-remote-node-editable)
     (ytr-new-comment-editable)))
 
-
-(defun ytr-insert-remote-issue-description (issue-id node-id level)
-  "Insert a remote node in org format"
-  (let-alist (ytr-retrieve-issue-alist issue-id)
-    (ytr-org-insert-node .description level 'description issue-id node-id (alist-get 'fullName .reporter) .created .attachments)))
-
-(defun ytr-insert-remote-comment (issue-id node-id level)
-  "Insert a remote node in org format"
-  (let-alist (ytr-retrieve-issue-comment-alist issue-id node-id)
-    (ytr-org-insert-node .text level 'comment issue-id node-id (alist-get 'fullName .author) .created .attachments)))
-
-(defun ytr-insert-remote-issue (issue-id level)
-  "Insert a remote issue in org format"
-  (ytr-insert-issue-alist-as-org (ytr-retrieve-issue-alist issue-id) level))
-
 (defun ytr-fetch-remote-node ()
   "Update a local node withs its remote content"
   (interactive)
@@ -765,14 +751,20 @@
          (issue-node-ids (ytr-shortcode-and-comment-id-from-org-property))
          (issue-id (car issue-node-ids))
          (node-id (cdr issue-node-ids))
+         (content-alist (cl-case type
+                          (comment (ytr-retrieve-issue-comment-alist issue-id node-id))
+                          (t (ytr-retrieve-issue-alist issue-id))
+                          ))
          (curlevel (org-current-level)))
     (let ((inhibit-read-only t)
           (inhibit-message t))
       (org-cut-subtree)
       (cl-case type
-        (description (ytr-insert-remote-issue-description issue-id node-id curlevel))
-        (comment (ytr-insert-remote-comment issue-id node-id curlevel))
-        (issue (ytr-insert-remote-issue issue-id curlevel))
+        (description (let-alist content-alist
+                       (ytr-org-insert-node .description curlevel 'description issue-id node-id (alist-get 'fullName .reporter) .created .attachments)))
+        (comment (let-alist content-alist
+                   (ytr-org-insert-node .text curlevel 'comment issue-id node-id (alist-get 'fullName .author) .created .attachments)))
+        (issue (ytr-insert-issue-alist-as-org content-alist curlevel))
         (t (user-error "Bad node type %s" type))))))
 
 (defun ytr-org-action (issue-node-ids)
