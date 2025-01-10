@@ -178,6 +178,7 @@
                                       :category 'ytr-shortcode
                                       :state 'ytr-consult-state-function
                                       :require-match t
+                                      :sort nil
                                       :history 'ytr-issue-history
                                       ;; :add-history (list (ytr-guess-shortcode)) ;; klappt noch nicht
                                       ;; :keymap tobedone
@@ -187,6 +188,7 @@
 (defun ytr-read-query-var-consult ()
   "Use consult to get a query from custom var"
   (consult--read ytr-queries
+                 :sort nil
                  :history 'ytr-query-history))
 
 (defcustom ytr-only-own-saved-queries t "Filter out saved queries from others" :type 'boolean :group 'ytr)
@@ -200,6 +202,7 @@
                                              queries-alist))
          (choices (mapcar (lambda (item) (alist-get 'query item)) queries-alist-filtered)))
     (consult--read choices
+                   :sort nil
                    :category 'ytr-query
                    :history 'ytr-query-history)))
 
