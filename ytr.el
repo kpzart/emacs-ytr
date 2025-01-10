@@ -241,8 +241,10 @@
 
 (defun ytr-shortcode-and-comment-id-from-org-property ()
   "Return the shortcode defined by an org property YTR_SHORTCODE or nil"
-  (let ((shortcode (org-entry-get (point) "YTR_SHORTCODE" t)))
-    (when shortcode (ytr-parse-shortcode-and-node-id shortcode))))
+  (if (derived-mode-p 'org-mode)
+      (let ((shortcode (org-entry-get (point) "YTR_SHORTCODE" t)))
+        (when shortcode (ytr-parse-shortcode-and-node-id shortcode)))
+    nil))
 
 (defun ytr-shortcode-from-branch ()
   "Return the shortcode from the name of the current git branch"
