@@ -59,7 +59,7 @@
 
 (defcustom ytr-use-saved-queries t "Wether to use saved queries of user defined queries" :type 'boolean :group 'ytr)
 
-(defcustom ytr-make-new-comment-behavior 'link "What should be done with the region from which a comment was created? One of 'kill, 'fetch (buggy), 'link or nil." :type '(choice (const kill) (const fetch) (const link)) :group 'ytr)
+(defcustom ytr-make-new-comment-behavior 'kill "What should be done with the region from which a comment was created? One of 'kill, 'fetch (buggy) or nil." :type '(choice (const kill) (const fetch)) :group 'ytr)
 
 (defcustom ytr-export-base-heading-level 2 "Highest Heading Level in exported markdown" :type 'integer :group 'ytr)
 
@@ -603,9 +603,7 @@
 (defun ytr-cancel-commit ()
   "Cancel committing something to youtrack"
   (interactive)
-  (let ((node-type ytr-buffer-node-type))
-    (set-window-configuration ytr-buffer-wconf))
-  (widen))
+  (set-window-configuration ytr-buffer-wconf))
 
 (defun ytr-remove-all-but-heading ()
   "Remove all line except the first, if its an org heading"
@@ -624,20 +622,18 @@
         (issue-id ytr-buffer-issue-id) ;; These vars are buffer local and we are going to switch buffer
         (curlevel ytr-buffer-curlevel))
     (set-window-configuration ytr-buffer-wconf)
-    (when new-node-id
-      (ytr-add-issue-to-history issue-id)
-      (message "New comment created on %s with node id %s." issue-id new-node-id)
-      (ytr-send-attachments-action (cons issue-id new-node-id))
-      (cond ((eq ytr-make-new-comment-behavior 'kill) (kill-region (point-min) (point-max)))
-            ((eq ytr-make-new-comment-behavior 'link)
-             (ytr-remove-all-but-heading)
-             (insert (format "%s#%s\n" issue-id new-node-id)))
-            ((eq ytr-make-new-comment-behavior 'fetch)
-             (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
-               (kill-region (point-min) (point-max))
-               (ytr-org-insert-node .text curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .attachments)))))
-    (widen)
-    (ytr-shortcode-buttonize-buffer)))
+    (ytr-add-issue-to-history issue-id)
+    (unless new-node-id (user-error "No node id retrieved"))
+    (message "New comment created on %s with node id %s." issue-id new-node-id)
+    (ytr-send-attachments-action (cons issue-id new-node-id))
+    (kill-new (format "%s#%s" issue-id new-node-id))
+    (cl-case ytr-make-new-comment-behavior
+      (kill (kill-region (point) (mark)))
+      (fetch
+       (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
+         (kill-region (point) (mark))
+         (ytr-org-insert-node .text curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .attachments))
+       (ytr-shortcode-buttonize-buffer)))))
 
 (defun ytr-commit-update-node ()
   "Commit the buffer to youtrack to update a node"
@@ -650,9 +646,12 @@
       (comment (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
       (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
     (set-window-configuration ytr-buffer-wconf)
+    (ytr-add-issue-to-history issue-id)
     (message "Node successfully updated")
     (ytr-send-attachments-action (cons issue-id (when (eq node-type 'comment) node-id)))
-    (ytr-fetch-remote-node)))
+    (ytr-fetch-remote-node)
+    (ytr-shortcode-buttonize-buffer)
+    ))
 
 (defun ytr-perform-markdown-replacements ()
   (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
@@ -669,9 +668,9 @@
 (defun ytr-new-comment-editable ()
   "Send the current subtree or region as comment to a ticket"
   (interactive)
-  (cond ((region-active-p) (narrow-to-region (mark) (point)))
-        (t (org-narrow-to-subtree)))
-  (goto-char (point-min))
+  (unless (region-active-p)
+    (org-mark-subtree)
+    (or (org-at-heading-p) (org-back-to-heading)))
   (let ((wconf (current-window-configuration))
         (issue-id (ytr-guess-or-read-shortcode))
         (curlevel (ytr-max-heading-level))
@@ -727,7 +726,6 @@
          (local-hash (org-entry-get (point) "YTR_CONTENT_HASH" t))
          (wconf (current-window-configuration))
          (attach-dir (or (org-attach-dir) "")))
-    (ytr-add-issue-to-history issue-id)
     (when (not (string= local-hash remote-hash))
       (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
     (org-gfm-export-as-markdown nil t)
