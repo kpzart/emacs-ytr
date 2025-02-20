@@ -1059,26 +1059,26 @@
                )
           (if choices
               (helm :sources (helm-build-sync-source
-                              "ytr-issues"
-                              :candidates choices
-                              :action '(("Open in browser" . (lambda (issue-alist)
-                                                               (let ((shortcode (alist-get 'idReadable issue-alist)))
-                                                                 (ytr-add-issue-to-history shortcode)
-                                                                 (browse-url (ytr-issue-url shortcode)))))
-                                        ("Open in org buffer" . (lambda (issue-alist)
-                                                                  (let ((shortcode (alist-get 'idReadable issue-alist)))
-                                                                    (ytr-add-issue-to-history shortcode)
-                                                                    (ytr-dart-org shortcode)))))
-                              :must-match 'ignore
-                              :persistent-action 'ytr-sneak-window-issue
-                              :keymap (let ((map (make-sparse-keymap)))
-                                        (set-keymap-parent map helm-map)
-                                        (define-key map (kbd "M-q") (lambda () (interactive) (helm-run-after-exit 'ytr-helm-query query)))
-                                        (define-key map (kbd "M-Q") (lambda () (interactive) (helm-run-after-exit 'ytr-helm-query)))
-                                        (define-key map (kbd "M-w") (lambda () (interactive) (helm-run-after-exit 'browse-url (ytr-query-url query))))
-                                        map)
-                              :cleanup (lambda () (kill-matching-buffers "*ytr-describe-issue*" nil t))
-                              )
+                                 "ytr-issues"
+                               :candidates choices
+                               :action '(("Open in browser" . (lambda (issue-alist)
+                                                                (let ((shortcode (alist-get 'idReadable issue-alist)))
+                                                                  (ytr-add-issue-to-history shortcode)
+                                                                  (browse-url (ytr-issue-url shortcode)))))
+                                         ("Open in org buffer" . (lambda (issue-alist)
+                                                                   (let ((shortcode (alist-get 'idReadable issue-alist)))
+                                                                     (ytr-add-issue-to-history shortcode)
+                                                                     (ytr-dart-org shortcode)))))
+                               :must-match 'ignore
+                               :persistent-action 'ytr-sneak-window-issue
+                               :keymap (let ((map (make-sparse-keymap)))
+                                         (set-keymap-parent map helm-map)
+                                         (define-key map (kbd "M-q") (lambda () (interactive) (helm-run-after-exit 'ytr-helm-query query)))
+                                         (define-key map (kbd "M-Q") (lambda () (interactive) (helm-run-after-exit 'ytr-helm-query)))
+                                         (define-key map (kbd "M-w") (lambda () (interactive) (helm-run-after-exit 'browse-url (ytr-query-url query))))
+                                         map)
+                               :cleanup (lambda () (kill-matching-buffers "*ytr-describe-issue*" nil t))
+                               )
                     :buffer "*helm ytr*")
             (message "No Issues found."))))
 
@@ -1094,13 +1094,13 @@
                )
           (if choices
               (helm :sources (helm-build-sync-source "ytr-issues"
-                                                     :candidates choices
-                                                     :action '(("Open in browser" . (lambda (issue-alist) (browse-url (ytr-issue-url (alist-get 'idReadable issue-alist)))))
-                                                               ("Open in org buffer" . (lambda (issue-alist) (ytr-dart-org (alist-get 'idReadable issue-alist)))))
-                                                     :must-match 'ignore
-                                                     :persistent-action 'ytr-sneak-window-issue
-                                                     :cleanup (lambda () (kill-matching-buffers "*ytr-describe-issue*" nil t))
-                                                     )
+                               :candidates choices
+                               :action '(("Open in browser" . (lambda (issue-alist) (browse-url (ytr-issue-url (alist-get 'idReadable issue-alist)))))
+                                         ("Open in org buffer" . (lambda (issue-alist) (ytr-dart-org (alist-get 'idReadable issue-alist)))))
+                               :must-match 'ignore
+                               :persistent-action 'ytr-sneak-window-issue
+                               :cleanup (lambda () (kill-matching-buffers "*ytr-describe-issue*" nil t))
+                               )
                     :buffer "*helm ytr*")
             (message "No Issues found."))
           ))
