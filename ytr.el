@@ -604,9 +604,7 @@
   "Cancel committing something to youtrack"
   (interactive)
   (let ((node-type ytr-buffer-node-type))
-    (set-window-configuration ytr-buffer-wconf)
-    (cl-case node-type
-      (issue (undo))))
+    (set-window-configuration ytr-buffer-wconf))
   (widen))
 
 (defun ytr-remove-all-but-heading ()
