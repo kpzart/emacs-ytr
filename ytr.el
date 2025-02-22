@@ -59,7 +59,7 @@
 
 (defcustom ytr-use-saved-queries t "Wether to use saved queries of user defined queries" :type 'boolean :group 'ytr)
 
-(defcustom ytr-make-new-comment-behavior 'kill "What should be done with the region from which a comment was created? One of 'kill, 'fetch or 'keep." :type '(choice (const kill) (const fetch) (const keep)) :group 'ytr)
+(defcustom ytr-make-new-comment-behavior 'kill "What should be done with the region from which a comment was created? One of 'kill, 'fetch, 'keep or 'keep-content." :type '(choice (const kill) (const fetch) (const keep) (const keep-content)) :group 'ytr)
 
 (defcustom ytr-export-base-heading-level 2 "Highest Heading Level in exported markdown" :type 'integer :group 'ytr)
 
@@ -629,6 +629,13 @@
     (kill-new (format "%s#%s" issue-id new-node-id))
     (cl-case ytr-make-new-comment-behavior
       (keep (deactivate-mark))
+      (keep-content
+       (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
+         (deactivate-mark)
+         (when (looking-at-p "\*+ ")
+           (insert "*")
+           (forward-char -1))
+         (ytr-org-insert-node nil curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .attachments)))
       (kill (kill-region (point) (mark)))
       (fetch
        (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
@@ -672,6 +679,7 @@
   (unless (region-active-p)
     (org-mark-subtree)
     (or (org-at-heading-p) (org-back-to-heading)))
+  (when (> (point) (mark)) (exchange-point-and-mark))
   (let ((wconf (current-window-configuration))
         (issue-id (ytr-guess-or-read-shortcode))
         (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
