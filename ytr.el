@@ -59,7 +59,7 @@
 
 (defcustom ytr-use-saved-queries t "Wether to use saved queries of user defined queries" :type 'boolean :group 'ytr)
 
-(defcustom ytr-make-new-comment-behavior 'kill "What should be done with the region from which a comment was created? One of 'kill, 'fetch (buggy) or nil." :type '(choice (const kill) (const fetch)) :group 'ytr)
+(defcustom ytr-make-new-comment-behavior 'kill "What should be done with the region from which a comment was created? One of 'kill, 'fetch or nil." :type '(choice (const kill) (const fetch)) :group 'ytr)
 
 (defcustom ytr-export-base-heading-level 2 "Highest Heading Level in exported markdown" :type 'integer :group 'ytr)
 
@@ -673,7 +673,7 @@
     (or (org-at-heading-p) (org-back-to-heading)))
   (let ((wconf (current-window-configuration))
         (issue-id (ytr-guess-or-read-shortcode))
-        (curlevel (ytr-max-heading-level))
+        (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
         (attach-dir (or (org-attach-dir) "")))
     (org-gfm-export-as-markdown nil nil)
     (ytr-perform-markdown-replacements)
