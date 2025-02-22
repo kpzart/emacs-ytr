@@ -59,7 +59,7 @@
 
 (defcustom ytr-use-saved-queries t "Wether to use saved queries of user defined queries" :type 'boolean :group 'ytr)
 
-(defcustom ytr-make-new-comment-behavior 'kill "What should be done with the region from which a comment was created? One of 'kill, 'fetch or nil." :type '(choice (const kill) (const fetch)) :group 'ytr)
+(defcustom ytr-make-new-comment-behavior 'kill "What should be done with the region from which a comment was created? One of 'kill, 'fetch or 'keep." :type '(choice (const kill) (const fetch) (const keep)) :group 'ytr)
 
 (defcustom ytr-export-base-heading-level 2 "Highest Heading Level in exported markdown" :type 'integer :group 'ytr)
 
@@ -628,6 +628,7 @@
     (ytr-send-attachments-action (cons issue-id new-node-id))
     (kill-new (format "%s#%s" issue-id new-node-id))
     (cl-case ytr-make-new-comment-behavior
+      (keep (deactivate-mark))
       (kill (kill-region (point) (mark)))
       (fetch
        (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
