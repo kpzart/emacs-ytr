@@ -59,7 +59,9 @@
 
 (defcustom ytr-use-saved-queries t "Wether to use saved queries of user defined queries" :type 'boolean :group 'ytr)
 
-(defcustom ytr-make-new-comment-behavior 'kill "What should be done with the region from which a comment was created? One of 'kill, 'fetch, 'keep or 'keep-content." :type '(choice (const kill) (const fetch) (const keep) (const keep-content)) :group 'ytr)
+(defcustom ytr-new-comment-behavior 'kill "What should be done with the region from which a comment was created? One of 'kill, 'fetch, 'keep or 'keep-content." :type '(choice (const kill) (const fetch) (const keep) (const keep-content)) :group 'ytr)
+
+(defcustom ytr-update-node-behavior 'keep-content "What should be done with the region from which a comment was created? One of 'kill, 'fetch, 'keep or 'keep-content." :type '(choice (const kill) (const fetch) (const keep) (const keep-content)) :group 'ytr)
 
 (defcustom ytr-export-base-heading-level 2 "Highest Heading Level in exported markdown" :type 'integer :group 'ytr)
 
@@ -626,8 +628,7 @@
     (unless new-node-id (user-error "No node id retrieved"))
     (message "New comment created on %s with node id %s." issue-id new-node-id)
     (ytr-send-attachments-action (cons issue-id new-node-id))
-    (kill-new (format "%s#%s" issue-id new-node-id))
-    (cl-case ytr-make-new-comment-behavior
+    (cl-case ytr-new-comment-behavior
       (keep (deactivate-mark))
       (keep-content
        (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
@@ -641,7 +642,9 @@
        (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
          (kill-region (point) (mark))
          (ytr-org-insert-node .text curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .attachments))
-       (ytr-shortcode-buttonize-buffer)))))
+       ))
+    (kill-new (format "%s#%s" issue-id new-node-id))
+    (ytr-shortcode-buttonize-buffer)))
 
 (defun ytr-commit-update-node ()
   "Commit the buffer to youtrack to update a node"
@@ -657,7 +660,18 @@
     (ytr-add-issue-to-history issue-id)
     (message "Node successfully updated")
     (ytr-send-attachments-action (cons issue-id (when (eq node-type 'comment) node-id)))
-    (ytr-fetch-remote-node)
+    (cl-case ytr-update-node-behavior
+      (keep (deactivate-mark))
+      (keep-content
+       (let-alist (ytr-retrieve-issue-comment-alist issue-id node-id)
+         (deactivate-mark)
+         (org-set-property "YTR_CONTENT_HASH" (if .text (sha1 .text) "")))
+       )
+      (kill (org-cut-subtree))
+      (fetch
+       (ytr-fetch-remote-node)
+       ))
+    (kill-new (format "%s#%s" issue-id node-id))
     (ytr-shortcode-buttonize-buffer)
     ))
 
