@@ -609,7 +609,9 @@
 (defun ytr-cancel-commit ()
   "Cancel committing something to youtrack"
   (interactive)
-  (set-window-configuration ytr-buffer-wconf))
+  (let ((buffer (buffer-name)))
+    (set-window-configuration ytr-buffer-wconf)
+    (kill-buffer buffer)))
 
 (defun ytr-remove-all-but-heading ()
   "Remove all line except the first, if its an org heading"
@@ -628,8 +630,10 @@
         (issue-id ytr-buffer-issue-id) ;; These vars are buffer local and we are going to switch buffer
         (curlevel ytr-buffer-curlevel)
         (text ytr-buffer-text)
-        (position ytr-buffer-position))
+        (position ytr-buffer-position)
+        (buffer (buffer-name)))
     (set-window-configuration ytr-buffer-wconf)
+    (kill-buffer buffer)
     (goto-char position)
     (set-mark (+ position (length text)))
     (ytr-add-issue-to-history issue-id)
@@ -663,12 +667,14 @@
   (let ((issue-id ytr-buffer-issue-id)
         (node-id ytr-buffer-node-id)
         (node-type ytr-buffer-node-type)
-        (position ytr-buffer-position))
+        (position ytr-buffer-position)
+        (buffer (buffer-name)))
     (cl-case ytr-buffer-node-type
       (description (ytr-send-issue-alist ytr-buffer-issue-id `((description . ,(buffer-string)))))
       (comment (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
       (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
     (set-window-configuration ytr-buffer-wconf)
+    (kill-buffer buffer)
     (goto-char position)
     (ytr-add-issue-to-history issue-id)
     (message "Node successfully updated")
