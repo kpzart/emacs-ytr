@@ -492,12 +492,12 @@
               .attachments)
       (insert "\n"))
     ;; do the description
-    (ytr-org-insert-node .description (+ 1 level) 'description .idReadable .id (alist-get 'fullName .reporter) .created .attachments)
+    (ytr-org-insert-node .description (+ 1 level) 'description .idReadable .id (alist-get 'fullName .reporter) .created .updated .attachments)
     ;; do the comments
     (let ((shortcode .idReadable))
       (mapcar (lambda (comment-alist)
                 (let-alist comment-alist
-                  (ytr-org-insert-node .text (+ 1 level) 'comment shortcode .id (alist-get 'fullName .author) .created .attachments)))
+                  (ytr-org-insert-node .text (+ 1 level) 'comment shortcode .id (alist-get 'fullName .author) .created .updated .attachments)))
               .comments))
     ;; postprocess
     (org-unindent-buffer)))
@@ -512,6 +512,7 @@
         (org-mode)
         (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
         (org-set-property "YTR_SHORTCODE" (format "%s" .idReadable))
+        (insert "#+COLUMNS:  %12YTR_AUTHOR(Author) %16YTR_CREATED_AT(Created) %16YTR_UPDATED_AT(Updated) %50ITEM(Title) %12YTR_NODE_TYPE(Type)\n")
         (ytr-insert-issue-alist-as-org issue-alist 1)
         (switch-to-buffer bufname)))))
 
@@ -549,29 +550,23 @@
              (new-heading (concat (make-string new-level ?*) " ")))
         (replace-match new-heading)))))
 
-(defun ytr-capitalize-first-char (&optional string)
-  "Capitalize only the first character of the input STRING."
-  (when (and string (> (length string) 0))
-    (let ((first-char (substring string nil 1))
-          (rest-str   (substring string 1)))
-      (concat (capitalize first-char) rest-str))))
-
-(defun ytr-org-insert-node (content level type issue-id node-id author created attachments)
+(defun ytr-org-insert-node (content level type issue-id node-id author created updated attachments)
   "Insert a node at point, level is that of the node, type is generic, author is a string, created is a long value"
   (let ((start (point))
         (type-string (format "%s" type)))
     (open-line 1)  ;; need this to ensure props go to correct heading
-    (insert (format "%s %s %s by %s\n\n"
+    (insert (format "%s %s\n\n"
                     (make-string level ?*)
-                    (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
-                    (capitalize (format "%s" type-string))
-                    author))
+                    (capitalize (format "%s" type-string))))
     (save-excursion
       (goto-char start)
       (org-set-tags (list (format "YTR_%s" (upcase type-string)))))
     (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
     (org-set-property "YTR_SHORTCODE" (format "%s#%s" issue-id node-id))
     (org-set-property "YTR_NODE_TYPE" type-string)
+    (org-set-property "YTR_CREATED_AT" (format-time-string "%Y-%m-%d %H:%M" (/ created 1000)))
+    (when updated (org-set-property "YTR_UPDATED_AT" (format-time-string "%Y-%m-%d %H:%M" (/ updated 1000))))
+    (org-set-property "YTR_AUTHOR" author)
     (kill-whole-line)  ;; kill line we just opened
     (when content (insert (ytr-md-to-org content (+ 1 level))))
     ;; (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))  ;; dont see the sense of those lines, keep a while commented
@@ -648,14 +643,14 @@
          (when (looking-at-p "\*+ ")
            (insert "*")
            (forward-char -1))
-         (ytr-org-insert-node nil curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .attachments)
+         (ytr-org-insert-node nil curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .updated .attachments)
          (goto-char position)
          (org-set-property "YTR_CONTENT_HASH" (if .text (sha1 .text) ""))))
       (kill (kill-region (point) (mark)))
       (fetch
        (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
          (kill-region (point) (mark))
-         (ytr-org-insert-node .text curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .attachments)
+         (ytr-org-insert-node .text curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .updated .attachments)
          (goto-char position))
        ))
     (kill-new (format "%s#%s" issue-id new-node-id))
@@ -810,9 +805,9 @@
         (org-cut-subtree)
         (cl-case type
           (description (let-alist content-alist
-                         (ytr-org-insert-node .description curlevel 'description issue-id node-id (alist-get 'fullName .reporter) .created .attachments)))
+                         (ytr-org-insert-node .description curlevel 'description issue-id node-id (alist-get 'fullName .reporter) .created .updated .attachments)))
           (comment (let-alist content-alist
-                     (ytr-org-insert-node .text curlevel 'comment issue-id node-id (alist-get 'fullName .author) .created .attachments)))
+                     (ytr-org-insert-node .text curlevel 'comment issue-id node-id (alist-get 'fullName .author) .created .updated .attachments)))
           (issue (ytr-insert-issue-alist-as-org content-alist curlevel))
           (t (user-error "Bad node type %s" type)))))))
 
