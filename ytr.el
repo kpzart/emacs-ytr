@@ -115,11 +115,12 @@
       (marginalia--fields
        ;; (:left .summary :format " %s" :face 'marginalia-type)
        ((ytr-get-customField-value issue-alist "Priority") :format "Pr: %s" :truncate .2 :face 'marginalia-documentation)
+       ((ytr-get-customField-value issue-alist "Type") :format "Ty: %s" :truncate .2 :face 'marginalia-documentation)
        ((ytr-get-customField-value issue-alist "State") :format "St: %s" :truncate .2 :face 'marginalia-documentation)
        ((ytr-get-customField-value issue-alist "Assignee") :format "As: %s" :truncate .2 :face 'marginalia-documentation)
        ((length (alist-get 'comments issue-alist)) :format "Re: %s" :truncate 7 :face 'marginalia-documentation)
-       ((format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)) :format "ct: %s" :truncate 20 :face 'marginalia-documentation)
-       ((format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) :format "ut: %s" :truncate 20 :face 'marginalia-documentation)
+       ((format-time-string "%Y-%m-%d" (/ .created 1000)) :format "ct: %s" :truncate 20 :face 'marginalia-documentation)
+       ((format-time-string "%Y-%m-%d" (/ .updated 1000)) :format "ut: %s" :truncate 20 :face 'marginalia-documentation)
        ))))
 
 (defun ytr-annotate-query (cand)
@@ -874,6 +875,9 @@
 (defconst ytr-sneak-field-reporter
   '("Reporter: %s" . (lambda (issue-alist) (alist-get 'fullName (alist-get 'reporter issue-alist))))
   "Field Definition for Sneak Preview to show the Reporter")
+(defconst ytr-sneak-field-type
+  '("Type: %s" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Type")))
+  "Field Definition for Sneak Preview to show the Priority")
 (defconst ytr-sneak-field-priority
   '("Priority: %s" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Priority")))
   "Field Definition for Sneak Preview to show the Priority")
@@ -888,7 +892,7 @@
   "Field Definition for Sneak Preview to show the Comments")
 
 (defcustom ytr-sneak-fields-issue
-  (list ytr-sneak-field-created ytr-sneak-field-updated ytr-sneak-field-resolved ytr-sneak-field-reporter ytr-sneak-field-priority ytr-sneak-field-state ytr-sneak-field-assignee ytr-sneak-field-comments)
+  (list ytr-sneak-field-created ytr-sneak-field-updated ytr-sneak-field-resolved ytr-sneak-field-reporter ytr-sneak-field-priority ytr-sneak-field-type ytr-sneak-field-state ytr-sneak-field-assignee ytr-sneak-field-comments)
   "List of fields to print in sneak window for issues. Each entry is a cons of a format definition and a function to compute the value, which receives as argument den issue-alist."
   :type '(repeat (cons string function)) :group 'ytr)
 
