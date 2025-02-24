@@ -622,8 +622,12 @@
   (interactive)
   (let ((new-node-id (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-id `((text . ,(buffer-string))))))
         (issue-id ytr-buffer-issue-id) ;; These vars are buffer local and we are going to switch buffer
-        (curlevel ytr-buffer-curlevel))
+        (curlevel ytr-buffer-curlevel)
+        (text ytr-buffer-text)
+        (position ytr-buffer-position))
     (set-window-configuration ytr-buffer-wconf)
+    (goto-char position)
+    (set-mark (+ position (length text)))
     (ytr-add-issue-to-history issue-id)
     (unless new-node-id (user-error "No node id retrieved"))
     (message "New comment created on %s with node id %s." issue-id new-node-id)
@@ -651,20 +655,21 @@
   (interactive)
   (let ((issue-id ytr-buffer-issue-id)
         (node-id ytr-buffer-node-id)
-        (node-type ytr-buffer-node-type))
+        (node-type ytr-buffer-node-type)
+        (position ytr-buffer-position))
     (cl-case ytr-buffer-node-type
       (description (ytr-send-issue-alist ytr-buffer-issue-id `((description . ,(buffer-string)))))
       (comment (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
       (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
     (set-window-configuration ytr-buffer-wconf)
+    (goto-char position)
     (ytr-add-issue-to-history issue-id)
     (message "Node successfully updated")
     (ytr-send-attachments-action (cons issue-id (when (eq node-type 'comment) node-id)))
     (cl-case ytr-update-node-behavior
-      (keep (deactivate-mark))
+      (keep)
       (keep-content
        (let-alist (ytr-retrieve-issue-comment-alist issue-id node-id)
-         (deactivate-mark)
          (org-set-property "YTR_CONTENT_HASH" (if .text (sha1 .text) "")))
        )
       (kill (org-cut-subtree))
@@ -694,7 +699,9 @@
     (org-mark-subtree)
     (or (org-at-heading-p) (org-back-to-heading)))
   (when (> (point) (mark)) (exchange-point-and-mark))
-  (let ((wconf (current-window-configuration))
+  (let ((position (point))
+        (text (buffer-substring-no-properties (region-beginning) (region-end)))
+        (wconf (current-window-configuration))
         (issue-id (ytr-guess-or-read-shortcode))
         (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
         (attach-dir (or (org-attach-dir) "")))
@@ -702,7 +709,9 @@
     (ytr-perform-markdown-replacements)
     (ytr-commit-new-comment-mode)
     (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
-    (setq-local ytr-buffer-wconf wconf
+    (setq-local ytr-buffer-position position
+                ytr-buffer-text text
+                ytr-buffer-wconf wconf
                 ytr-buffer-curlevel curlevel
                 ytr-buffer-issue-id issue-id
                 ytr-buffer-node-type 'comment
@@ -747,6 +756,7 @@
                     (t (user-error (format "Unknown node type: %s" type)))))
          (remote-hash (if content (sha1 content) ""))
          (local-hash (org-entry-get (point) "YTR_CONTENT_HASH" t))
+         (position (point))
          (wconf (current-window-configuration))
          (attach-dir (or (org-attach-dir) "")))
     (when (not (string= local-hash remote-hash))
@@ -755,7 +765,8 @@
     (ytr-perform-markdown-replacements)
     (ytr-commit-update-node-mode)
     (message "Update %s%s on issue %s" type (if (eq type 'comment) (format " with ID %s" node-id) "") issue-id)
-    (setq-local ytr-buffer-wconf wconf
+    (setq-local ytr-buffer-position position
+                ytr-buffer-wconf wconf
                 ytr-buffer-commit-type 'update
                 ytr-buffer-node-type type
                 ytr-buffer-issue-id issue-id
