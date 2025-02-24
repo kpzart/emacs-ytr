@@ -556,12 +556,13 @@
   (let ((start (point))
         (type-string (format "%s" type)))
     (open-line 1)  ;; need this to ensure props go to correct heading
-    (insert (format "%s %s\n\n"
+    (insert (format "%s %s by %s\n\n"
                     (make-string level ?*)
-                    (capitalize (format "%s" type-string))))
+                    (format-time-string "%Y-%m-%d" (/ created 1000))
+                    author))
     (save-excursion
       (goto-char start)
-      (org-set-tags (list (format "YTR_%s" (upcase type-string)))))
+      (org-set-tags (list (capitalize type-string))))
     (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
     (org-set-property "YTR_SHORTCODE" (format "%s#%s" issue-id node-id))
     (org-set-property "YTR_NODE_TYPE" type-string)
