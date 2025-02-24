@@ -558,16 +558,20 @@
 
 (defun ytr-org-insert-node (content level type issue-id node-id author created attachments)
   "Insert a node at point, level is that of the node, type is generic, author is a string, created is a long value"
-  (let ((start (point)))
+  (let ((start (point))
+        (type-string (format "%s" type)))
     (open-line 1)  ;; need this to ensure props go to correct heading
     (insert (format "%s %s %s by %s\n\n"
                     (make-string level ?*)
                     (format-time-string "%Y-%m-%d %H:%M" (/ created 1000))
-                    (ytr-capitalize-first-char (format "%s" type))
+                    (capitalize (format "%s" type-string))
                     author))
+    (save-excursion
+      (goto-char start)
+      (org-set-tags (list (format "YTR_%s" (upcase type-string)))))
     (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
     (org-set-property "YTR_SHORTCODE" (format "%s#%s" issue-id node-id))
-    (org-set-property "YTR_NODE_TYPE" (format "%s" type))
+    (org-set-property "YTR_NODE_TYPE" type-string)
     (kill-whole-line)  ;; kill line we just opened
     (when content (insert (ytr-md-to-org content (+ 1 level))))
     ;; (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))  ;; dont see the sense of those lines, keep a while commented
