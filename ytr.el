@@ -576,7 +576,8 @@
     (when (/= (length attachments) 0)
       (save-excursion
         (goto-char start)
-        (org-set-tags '("YTR_ATTACH"))))
+        (org-set-tags (append (org-get-tags) '("YTR_ATTACH")))
+        ))
     (mapcar (lambda (attachment-alist)
               (let-alist attachment-alist
                 (replace-string-in-region (format "[[file:%s]]" .name)
