@@ -513,7 +513,7 @@
         (org-mode)
         (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
         (org-set-property "YTR_SHORTCODE" (format "%s" .idReadable))
-        (insert "#+COLUMNS:  %12YTR_AUTHOR(Author) %16YTR_CREATED_AT(Created) %16YTR_UPDATED_AT(Updated) %50ITEM(Title) %12YTR_NODE_TYPE(Type)\n")
+        (insert "#+COLUMNS: %50ITEM(Title) %16YTR_CREATED_AT(Created) %16YTR_UPDATED_AT(Updated) %20YTR_AUTHOR(Author) %12YTR_NODE_TYPE(Type)\n")
         (ytr-insert-issue-alist-as-org issue-alist 1)
         (switch-to-buffer bufname)))))
 
