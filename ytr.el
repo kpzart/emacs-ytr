@@ -547,7 +547,7 @@
     (goto-char (point-min))
     (while (re-search-forward "^\\(\\*+\\) " nil t)
       (let* ((heading-level (length (match-string 1)))
-             (new-level (min (+ heading-level level) 6))
+             (new-level (min (+ heading-level level) 12))
              (new-heading (concat (make-string new-level ?*) " ")))
         (replace-match new-heading)))))
 
@@ -700,6 +700,7 @@
   (replace-regexp-in-region (format "](file://%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
   (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
   (replace-regexp-in-region ":.*:$" "" (point-min) (point-max))
+  (replace-string-in-region "\n\n\n" "\n\n" (point-min) (point-max))
   (whitespace-cleanup)
   )
 
