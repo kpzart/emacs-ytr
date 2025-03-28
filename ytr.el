@@ -680,9 +680,11 @@
     (cl-case ytr-update-node-behavior
       (keep)
       (keep-content
-       (let-alist (ytr-retrieve-issue-comment-alist issue-id node-id)
-         (org-set-property "YTR_CONTENT_HASH" (if .text (sha1 .text) "")))
-       )
+       (org-set-property "YTR_CONTENT_HASH"
+                         (let ((content (cl-case node-type
+                                          (description (alist-get .description (ytr-retrieve-issue-alist issue-id)))
+                                          (comment (alist-get .text (ytr-retrieve-issue-comment-alist issue-id node-id))))))
+                           (if content (sha1 content) ""))))
       (kill (org-cut-subtree))
       (fetch
        (ytr-fetch-remote-node)
