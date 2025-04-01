@@ -462,22 +462,36 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 
 LEVEL indicates the level of top level headings in org and defaults to 3."
   (save-current-buffer
-    (set-buffer (get-buffer-create "*ytr-convert*"))
-    (erase-buffer)
-    (insert input)
-    (shell-command-on-region (point-min) (point-max)
-                             (format "pandoc --wrap=preserve -f gfm -t org")
-                             nil t "*ytr-convert-error*")
-    (let ((inhibit-message t))
-      (replace-string "☒" "[X]" t (point-min) (point-max))
-      (replace-string "☐" "[ ]" t (point-min) (point-max)))
-    (goto-char (point-min))
-    (flush-lines " *:[A-Z_]+:.*$") ; remove properties
-    (goto-char (point-max))
-    (insert "\n")
-    (org-mode)
-    (ytr-demote-org-headings (or level 3))
-    (org-unindent-buffer)
+    (let ((input-md-buffer (get-buffer-create "*ytr-input-md*"))
+          (pandoc-org-buffer (get-buffer-create "*ytr-pandoc-org*"))
+          (org-export-gfm-buffer (get-buffer-create "*ytr-org-export-gfm*"))
+          (diff-md-buffer (get-buffer-create "*ytr-diff-md*")))
+      (set-buffer pandoc-org-buffer)
+      (erase-buffer)
+      (insert input)
+      (shell-command-on-region (point-min) (point-max)
+                               (format "pandoc --wrap=preserve -f gfm -t org")
+                               nil t "*ytr-pandoc-error*")
+      (let ((inhibit-message t))
+        (replace-string "☒" "[X]" t (point-min) (point-max))
+        (replace-string "☐" "[ ]" t (point-min) (point-max)))
+      (goto-char (point-min))
+      (flush-lines " *:[A-Z_]+:.*$") ; remove properties
+      (goto-char (point-max))
+      (insert "\n")
+      (org-mode)
+      (ytr-demote-org-headings (or level 3))
+      (org-unindent-buffer)
+      ;; now create the patch
+      (with-current-buffer input-md-buffer
+        (erase-buffer)
+        (insert input))
+      (save-current-buffer
+        (org-export-to-buffer 'gfm org-export-gfm-buffer)
+        (ytr-perform-markdown-replacements "")
+        (unwind-protect
+            (progn
+              (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer )))))
     (buffer-string)))
 
 (defun ytr-insert-issue-alist-as-org (issue-alist level)
