@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 ;;; ytr.el --- Youtrack integration into emacs
 
 ;; Copyright (C) 2010-2023 Martin Puttke
@@ -59,14 +60,37 @@
 
 (defcustom ytr-use-saved-queries t "Wether to use saved queries of user defined queries" :type 'boolean :group 'ytr)
 
-(defcustom ytr-new-comment-behavior 'kill "What should be done with the region from which a comment was created? One of 'kill, 'fetch, 'keep or 'keep-content." :type '(choice (const kill) (const fetch) (const keep) (const keep-content)) :group 'ytr)
+(defcustom ytr-new-comment-behavior 'kill
+  "Define what will be done with the submitted region after comment creation.
 
-(defcustom ytr-update-node-behavior 'keep-content "What should be done with the region from which a comment was created? One of 'kill, 'fetch, 'keep or 'keep-content." :type '(choice (const kill) (const fetch) (const keep) (const keep-content)) :group 'ytr)
+One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
+  :type '(choice (const kill) (const fetch) (const keep) (const keep-content)) :group 'ytr)
+
+(defcustom ytr-update-node-behavior 'keep-content
+  "Define what will be done with the submitted region after a node update.
+
+One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
+  :type '(choice (const kill) (const fetch) (const keep) (const keep-content)) :group 'ytr)
 
 (defcustom ytr-export-base-heading-level 2 "Highest Heading Level in exported markdown" :type 'integer :group 'ytr)
 
 (defvar ytr-issue-history '() "History for issues")
 (defvar ytr-query-history '() "History for query")
+
+(defvar ytr-issues-alist '() "Issues alist used for annotations")
+(defvar ytr-queries-alist '() "Queries alist used for annotations")
+
+(defvar ytr-capture-shortcode "" "Shortcode for org capture template")
+(defvar ytr-capture-summary "" "Summary for org capture template")
+
+(defvar-local ytr-buffer-position nil "Buffer local var to store position")
+(defvar-local ytr-buffer-text nil "Buffer local var to store text")
+(defvar-local ytr-buffer-wconf nil "Buffer local var to store wconf")
+(defvar-local ytr-buffer-curlevel nil "Buffer local var to store curlevel")
+(defvar-local ytr-buffer-issue-id nil "Buffer local var to store issue-id")
+(defvar-local ytr-buffer-node-id nil "Buffer local var to store node-id")
+(defvar-local ytr-buffer-node-type nil "Buffer local var to store node-type")
+(defvar-local ytr-buffer-commit-type nil "Buffer local var to store commit-type")
 
 ;;;; urls
 (defun ytr-issue-url (shortcode)
@@ -74,7 +98,7 @@
   (concat ytr-baseurl "/issue/" shortcode))
 
 (defun ytr-issue-comment-url (shortcode comment-id)
-  "Return the URL for a issue given by shortcode with focus on comment with comment-id"
+  "Return URL for a issue given by shortcode with focus on comment with comment-id"
   (concat ytr-baseurl "/issue/" shortcode "#focus=Comments-" comment-id ".0-0"))
 
 (defun ytr-query-url (query)
@@ -110,7 +134,7 @@
   (let* ((shortcode (car (split-string cand ":")))
          (issue-alist (cl-find-if (lambda (elem)
                                     (string= (alist-get 'idReadable elem) shortcode))
-                                  issues-alist))) ;; issues-alist comes from ytr-read-shortcode-annotated via lexical binding!
+                                  ytr-issues-alist))) ;; ytr-issues-alist comes from ytr-read-shortcode-annotated via dynamic binding!
     (let-alist issue-alist
       (marginalia--fields
        ;; (:left .summary :format " %s" :face 'marginalia-type)
@@ -125,12 +149,12 @@
 
 (defun ytr-annotate-query (cand)
   "Annotate queries with some info"
-  (let* ((query-alist (cl-find-if (lambda (elem) (string= (alist-get 'query elem) cand)) queries-alist))
+  (let* ((query-alist (cl-find-if (lambda (elem) (string= (alist-get 'query elem) cand)) ytr-queries-alist))
          (name (alist-get 'name query-alist))
          (total (alist-get 'issues query-alist))
          (unresolved (seq-drop-while (lambda (issue) (alist-get 'resolved issue)) total))
          (mine (seq-take-while (lambda (issue) (string= ytr-user-full-name (ytr-get-customField-value issue "Assignee"))) unresolved))
-         ) ;; queries-alist comes from ytr-read-shortcode-annotated via lexical binding!
+         ) ;; queries-alist comes from ytr-read-shortcode-annotated via dynamic binding!
     (marginalia--fields
      (name :truncate .5 :face 'marginalia-documentation)
      ((length total) :format "Total: %s" :truncate .2 :face 'marginalia-type)
@@ -156,10 +180,10 @@
   (interactive)
   (let ((query (completing-read "Query: " ytr-queries nil nil)))
     (if (string-match-p "^[a-zA-Z]+-[0-9]+$" query) query ;; if query is already a shortcode
-      (let ((issues-alist (ytr-retrieve-query-issues-alist query)))
-        (if (length> issues-alist 0)
+      (let ((ytr-issues-alist (ytr-retrieve-query-issues-alist query)))
+        (if (length> ytr-issues-alist 0)
             (ytr-completing-read-categorised "Issue: "
-                                             (mapcar (lambda (item) (alist-get 'idReadable item)) issues-alist)
+                                             (mapcar (lambda (item) (alist-get 'idReadable item)) ytr-issues-alist)
                                              'ytr-shortcode)
           (user-error "Query returned empty results."))))))
 
@@ -168,7 +192,7 @@
   ""
   (cl-case action
     (preview (ytr-sneak-window-issue
-              (cl-find-if (lambda (elem) (string= (alist-get 'idReadable elem) (car (split-string cand ":")))) issues-alist)))
+              (cl-find-if (lambda (elem) (string= (alist-get 'idReadable elem) (car (split-string cand ":")))) ytr-issues-alist)))
     (exit (quit-window))))
 
 (defun ytr-read-shortcode-from-query-consult (query)
@@ -198,11 +222,11 @@
 
 (defun ytr-read-query-saved-consult ()
   "Use consult to get a query from saved queries"
-  (let* ((queries-alist (ytr-retrieve-saved-queries-alist))
+  (let* ((ytr-queries-alist (ytr-retrieve-saved-queries-alist))
          (queries-alist-filtered (seq-filter (lambda (elem)
                                                (string= (alist-get 'fullName (alist-get 'owner elem))
                                                         ytr-user-full-name))
-                                             queries-alist))
+                                             ytr-queries-alist))
          (choices (mapcar (lambda (item) (alist-get 'query item)) queries-alist-filtered)))
     (consult--read choices
                    :sort nil
@@ -235,7 +259,7 @@
     nil))
 
 (defun ytr-shortcode-and-comment-id-from-point ()
-  "Return a cons with the shortcode and optioinal the item id at point or nil if there is none"
+  "Return the shortcode and optional the item id at point or nil if there is none."
   (ytr-parse-shortcode-and-node-id (ffap-string-at-point 'ytr)))
 
 (defun ytr-shortcode-from-point ()
@@ -357,6 +381,7 @@
                                 (when ytr-request-debug (message "Done: %s" (request-response-status-code response)))))
         :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
                               (setq ytr-request-response error-thrown)
+                              (setq ytr-request-failure t)
                               (message "Got error: %S" error-thrown)))))
     (while (not (or ytr-request-failure ytr-request-response (> counter (+ request-timeout 1))))
       (setq counter (+ 1 counter))
@@ -413,7 +438,7 @@
   (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue-id "/comments/") (json-encode alist)))
 
 (defun ytr-send-issue-comment-alist (issue-id comment-id alist)
-  "Send the information in ALIST for a remote update of an issue comment with id ISSUE"
+  "Send information in ALIST for a remote update of an issue comment with id ISSUE"
   (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=text") (json-encode alist)))
 
 (defun ytr-send-issue-alist (issue alist)
@@ -433,7 +458,9 @@
 
 ;;;; org mode conversion
 (defun ytr-md-to-org (input level)
-  "Convert a markdown string to org mode using pandoc. LEVEL indicates the level of top level headings in org and defaults to 3."
+  "Convert a markdown string to org mode using pandoc.
+
+LEVEL indicates the level of top level headings in org and defaults to 3."
   (save-current-buffer
     (set-buffer (get-buffer-create "*ytr-convert*"))
     (erase-buffer)
@@ -462,44 +489,44 @@
     (org-set-property "YTR_NODE_TYPE" "issue")
     (kill-whole-line)  ;; kill line we just opened
     (insert (format "%s Links\n\n" (make-string (+ 1 level) ?*)))
-    (mapcar (lambda (link-alist)
-              (let-alist link-alist
-                (unless (equal (length .issues) 0)
-                  (insert (format "%s %s\n\n"
-                                  (make-string (+ 2 level) ?*)
-                                  (cond ((string= .direction "BOTH") (alist-get 'sourceToTarget .linkType))
-                                        ((string= .direction "INWARD") (alist-get 'targetToSource .linkType))
-                                        ((string= .direction "OUTWARD") (alist-get 'sourceToTarget .linkType))
-                                        (t (message "Unknown link direction: %s" .direction)))))
-                  (mapcar (lambda (issue-alist)
-                            (let-alist issue-alist
-                              (insert (format " - *%s*: %s\n" .idReadable .summary))))
-                          .issues)
-                  (insert "\n"))))
-            .links)
+    (mapc (lambda (link-alist)
+            (let-alist link-alist
+              (unless (equal (length .issues) 0)
+                (insert (format "%s %s\n\n"
+                                (make-string (+ 2 level) ?*)
+                                (cond ((string= .direction "BOTH") (alist-get 'sourceToTarget .linkType))
+                                      ((string= .direction "INWARD") (alist-get 'targetToSource .linkType))
+                                      ((string= .direction "OUTWARD") (alist-get 'sourceToTarget .linkType))
+                                      (t (message "Unknown link direction: %s" .direction)))))
+                (mapc (lambda (issue-alist)
+                        (let-alist issue-alist
+                          (insert (format " - *%s*: %s\n" .idReadable .summary))))
+                      .issues)
+                (insert "\n"))))
+          .links)
     (unless (eq .attachments '[])
       (insert (format "%s Attachments\n\n" (make-string (+ 1 level) ?*)))
-      (mapcar (lambda (attachment-alist)
-                (let-alist attachment-alist
-                  (insert (format "- [[%s%s][%s]] %s %s (%s)\n"
-                                  ytr-baseurl
-                                  .url
-                                  .name
-                                  .mimeType
-                                  (file-size-human-readable .size)
-                                  (if .comment
-                                      (format "Comment %s" (alist-get 'id .comment))
-                                    "Issue")))))
-              .attachments)
+      (mapc (lambda (attachment-alist)
+              (let-alist attachment-alist
+                (insert (format "- [[%s%s][%s]] %s %s (%s)\n"
+                                ytr-baseurl
+                                .url
+                                .name
+                                .mimeType
+                                (file-size-human-readable .size)
+                                (if .comment
+                                    (format "Comment %s" (alist-get 'id .comment))
+                                  "Issue")))))
+            .attachments)
       (insert "\n"))
     ;; do the description
     (ytr-org-insert-node .description (+ 1 level) 'description .idReadable .id (alist-get 'fullName .reporter) .created .updated .attachments)
     ;; do the comments
     (let ((shortcode .idReadable))
-      (mapcar (lambda (comment-alist)
-                (let-alist comment-alist
-                  (ytr-org-insert-node .text (+ 1 level) 'comment shortcode .id (alist-get 'fullName .author) .created .updated .attachments)))
-              .comments))
+      (mapc (lambda (comment-alist)
+              (let-alist comment-alist
+                (ytr-org-insert-node .text (+ 1 level) 'comment shortcode .id (alist-get 'fullName .author) .created .updated .attachments)))
+            .comments))
     ;; postprocess
     (org-unindent-buffer)))
 
@@ -552,7 +579,10 @@
         (replace-match new-heading)))))
 
 (defun ytr-org-insert-node (content level type issue-id node-id author created updated attachments)
-  "Insert a node at point, level is that of the node, type is generic, author is a string, created is a long value"
+  "Insert a node at point.
+
+Level is that of the node, type is generic, author is a string, created is a
+long value"
   (let ((start (point))
         (type-string (format "%s" type)))
     (open-line 1)  ;; need this to ensure props go to correct heading
@@ -589,7 +619,10 @@
             attachments)))
 
 (defun ytr-find-node ()
-  "Find the parent heading with a YTR_NODE_TYPE property, sets the point and returns the type. If property is not found in buffer returns nil."
+  "Find the parent heading with a YTR_NODE_TYPE property.
+
+Sets the point and returns the type. If property is not found in buffer returns
+nil."
   (when (or (org-at-heading-p) (org-back-to-heading))
     (let ((type (org-entry-get (point) "YTR_NODE_TYPE")))
       (if type (intern type)
@@ -682,8 +715,8 @@
       (keep-content
        (org-set-property "YTR_CONTENT_HASH"
                          (let ((content (cl-case node-type
-                                          (description (alist-get .description (ytr-retrieve-issue-alist issue-id)))
-                                          (comment (alist-get .text (ytr-retrieve-issue-comment-alist issue-id node-id))))))
+                                          (description (alist-get '.description (ytr-retrieve-issue-alist issue-id)))
+                                          (comment (alist-get '.text (ytr-retrieve-issue-comment-alist issue-id node-id))))))
                            (if content (sha1 content) ""))))
       (kill (org-cut-subtree))
       (fetch
@@ -693,7 +726,7 @@
     (ytr-shortcode-buttonize-buffer)
     ))
 
-(defun ytr-perform-markdown-replacements ()
+(defun ytr-perform-markdown-replacements (attach-dir)
   (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
   (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\(?:png\\|jpeg\\|jpg\\)\\))" ytr-baseurl) "![](\\1)" (point-min) (point-max))
   (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "[\\1](\\2)" (point-min) (point-max))
@@ -720,7 +753,7 @@
         (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
         (attach-dir (or (org-attach-dir) "")))
     (org-gfm-export-as-markdown nil nil)
-    (ytr-perform-markdown-replacements)
+    (ytr-perform-markdown-replacements attach-dir)
     (ytr-commit-new-comment-mode)
     (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
     (setq-local ytr-buffer-position position
@@ -776,7 +809,7 @@
     (when (not (string= local-hash remote-hash))
       (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
     (org-gfm-export-as-markdown nil t)
-    (ytr-perform-markdown-replacements)
+    (ytr-perform-markdown-replacements attach-dir)
     (ytr-commit-update-node-mode)
     (message "Update %s%s on issue %s" type (if (eq type 'comment) (format " with ID %s" node-id) "") issue-id)
     (setq-local ytr-buffer-position position
@@ -847,13 +880,13 @@
     (erase-buffer)
     (org-mode)
     (insert "#+Title: Org Issues from Query\n\n")
-    (mapcar (lambda (item)
-              (ytr-insert-issue-alist-as-org (ytr-retrieve-issue-alist (alist-get 'idReadable item))))
-            issues-alist)
+    (mapc (lambda (item)
+            (ytr-insert-issue-alist-as-org (ytr-retrieve-issue-alist (alist-get 'idReadable item)) 1 ))
+          issues-alist)
     (switch-to-buffer bufname)))
 
 (defun ytr-send-attachments-action (issue-node-ids)
-  "Send the attachments at org heading to issue or node and remove them locally (will ask)."
+  "Send the attachments at org heading to issue or node and remove them locally."
   (when (and (org-attach-dir) (org-attach-file-list (org-attach-dir)))
     (let* ((paths (mapcar (lambda (filename)
                             (file-name-concat (expand-file-name (org-attach-dir)) filename))
@@ -898,7 +931,10 @@
 
 (defcustom ytr-sneak-fields-issue
   (list ytr-sneak-field-created ytr-sneak-field-updated ytr-sneak-field-resolved ytr-sneak-field-reporter ytr-sneak-field-priority ytr-sneak-field-type ytr-sneak-field-state ytr-sneak-field-assignee ytr-sneak-field-comments)
-  "List of fields to print in sneak window for issues. Each entry is a cons of a format definition and a function to compute the value, which receives as argument den issue-alist."
+  "List of fields to print in sneak window for issues.
+
+Each entry is a cons of a format definition and a function to compute the value,
+which receives as argument den issue-alist."
   :type '(repeat (cons string function)) :group 'ytr)
 
 (defun ytr-sneak-window-issue (issue-alist)
@@ -911,15 +947,15 @@
                                   ytr-sneak-fields-issue) ", "))
       (unless (= (length .attachments) 0)
         (princ "\nAttachments:")
-        (mapcar (lambda (attachment-alist)
-                  (let-alist attachment-alist
-                    (princ (format " [\"%s\" %s %s]" .name .mimeType (file-size-human-readable .size)))))
-                .attachments))
+        (mapc (lambda (attachment-alist)
+                (let-alist attachment-alist
+                  (princ (format " [\"%s\" %s %s]" .name .mimeType (file-size-human-readable .size)))))
+              .attachments))
       (princ "\n------------------------\n")
       (princ .description))))
 
 (defun ytr-sneak-window-comment (issue-alist comment-id)
-  "Display a side window with the description and same basic information on the comment."
+  "Display a side window with the description and basic information on the comment."
   (with-output-to-temp-buffer "*ytr-describe-comment*"
     (let-alist (cl-find-if (lambda (elem)
                              (string= (alist-get 'id elem) comment-id))
@@ -932,15 +968,15 @@
                      (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-")))
       (unless (= (length .attachments) 7)
         (princ "\nAttachments:")
-        (mapcar (lambda (attachment-alist)
-                  (let-alist attachment-alist
-                    (princ (format " [\"%s\" %s %s]" .name .mimeType (file-size-human-readable .size)))))
-                .attachments))
+        (mapc (lambda (attachment-alist)
+                (let-alist attachment-alist
+                  (princ (format " [\"%s\" %s %s]" .name .mimeType (file-size-human-readable .size)))))
+              .attachments))
       (princ "\n------------------------\n")
       (princ .text))))
 
 (defun ytr-sneak-action (issue-node-ids)
-  "Display a side window with the description and same basic information on issue and comment id cons cell."
+  "Display a side window with some basic information on issue and comment."
   (let* ((shortcode (car issue-node-ids))
          (comment-id (cdr issue-node-ids))
          (issue-alist (ytr-retrieve-issue-alist shortcode)))
@@ -1021,15 +1057,15 @@
 (defun ytr-capture-action (issue-comment-ids)
   "Capture a proxy org task that references an issue on ytr"
   (let-alist (ytr-retrieve-issue-alist (car issue-comment-ids))
-    (setq ytr-summary .summary)
-    (setq ytr-shortcode .idReadable)
+    (setq ytr-capture-summary .summary)
+    (setq ytr-capture-shortcode .idReadable)
     (org-capture nil ytr-capture-key)
     (ytr-org-link-heading-action issue-comment-ids)))
 
 ;;;; actions
 (defmacro ytr-define-dart-action (name action)
   `(defun ,(intern (format "ytr-dart-%s" name)) (shortcode-node)
-     ,(format "Like ytr-%s but offers a simple prompt for entering the shortcode with no completions. It may have a node id." name)
+     ,(format "Like ytr-%s but with simple prompt for shortcode.\n It may have a node id." name)
      (interactive "sShortcode (may also have comment id): ")
      (funcall ,action (ytr-parse-shortcode-and-node-id shortcode-node))))
 
@@ -1081,7 +1117,7 @@
 
 (defun ytr-on-shortcode-button (button)
   (let ((issue-comment-ids (ytr-parse-shortcode-and-node-id (buffer-substring (button-start button) (button-end button)))))
-    (ytr-dart-browse (car issue-comment-ids) (cdr issue-comment-ids))))
+    (ytr-dart-browse issue-comment-ids)))
 
 (defun ytr-shortcode-buttonize-buffer ()
   "turn all issue shortcodes into buttons"
