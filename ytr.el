@@ -457,10 +457,12 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
     (if value-name value-name "-")))
 
 ;;;; org mode conversion
-(defun ytr-md-to-org (input level)
+(defun ytr-md-to-org (input level &optional patch-file)
   "Convert a markdown string to org mode using pandoc.
 
-LEVEL indicates the level of top level headings in org and defaults to 3."
+LEVEL indicates the level of top level headings in org and defaults to 3.
+If PATCH-FILE is given, a diff file is written, that contains possible
+conversion loss."
   (save-current-buffer
     (let ((input-md-buffer (get-buffer-create "*ytr-input-md*"))
           (pandoc-org-buffer (get-buffer-create "*ytr-pandoc-org*"))
@@ -483,16 +485,19 @@ LEVEL indicates the level of top level headings in org and defaults to 3."
       (ytr-demote-org-headings (or level 3))
       (org-unindent-buffer)
       ;; now create the patch
-      (with-current-buffer input-md-buffer
-        (erase-buffer)
-        (insert input))
-      (save-current-buffer
-        (org-export-to-buffer 'gfm org-export-gfm-buffer)
-        (ytr-perform-markdown-replacements "")
-        (unwind-protect
-            (progn
-              (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer )))))
-    (buffer-string)))
+      (when patch-file
+        (with-current-buffer input-md-buffer
+          (erase-buffer)
+          (insert input))
+        (save-current-buffer
+          (org-export-to-buffer 'gfm org-export-gfm-buffer)
+          (ytr-perform-markdown-replacements "")
+          (unwind-protect
+              (progn
+                (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer )
+                (with-current-buffer diff-md-buffer
+                  (write-region (point-min) (point-max) patch-file))))))
+      (buffer-string))))
 
 (defun ytr-insert-issue-alist-as-org (issue-alist level)
   "Insert the issue given by ISSUE-ALIST as org at point"
