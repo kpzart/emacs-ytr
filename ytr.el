@@ -143,8 +143,8 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
        ((ytr-get-customField-value issue-alist "State") :format "St: %s" :truncate .2 :face 'marginalia-documentation)
        ((ytr-get-customField-value issue-alist "Assignee") :format "As: %s" :truncate .2 :face 'marginalia-documentation)
        ((length (alist-get 'comments issue-alist)) :format "Re: %s" :truncate 7 :face 'marginalia-documentation)
-       ((format-time-string "%Y-%m-%d" (/ .created 1000)) :format "ct: %s" :truncate 20 :face 'marginalia-documentation)
-       ((format-time-string "%Y-%m-%d" (/ .updated 1000)) :format "ut: %s" :truncate 20 :face 'marginalia-documentation)
+       ((if .created (format-time-string "%Y-%m-%d" (/ .created 1000)) "-") :format "ct: %s" :truncate 20 :face 'marginalia-documentation)
+       ((if .updated (format-time-string "%Y-%m-%d" (/ .updated 1000)) "-") :format "ut: %s" :truncate 20 :face 'marginalia-documentation)
        ))))
 
 (defun ytr-annotate-query (cand)
@@ -197,10 +197,10 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 
 (defun ytr-read-issue-code-from-query-consult (query)
   "Use consult to get the issue code from a given QUERY"
-  (let* ((issues-alist (ytr-retrieve-query-issues-alist query))
+  (let* ((ytr-issues-alist (ytr-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
                             (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
-                          issues-alist)))
+                          ytr-issues-alist)))
     (car (split-string (consult--read choices
                                       :category 'ytr-issue-code
                                       :state 'ytr-consult-state-function
@@ -923,7 +923,7 @@ nil."
 
 ;;;; preview
 (defconst ytr-sneak-field-created
-  '("created: %s" . (lambda (issue-alist) (format-time-string "%Y-%m-%d %H:%M" (/ (alist-get 'created issue-alist) 1000))))
+  '("created: %s" . (lambda (issue-alist) (let-alist issue-alist (if .created (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)) "-"))))
   "Field Definition for Sneak Preview to show the created")
 (defconst ytr-sneak-field-updated
   '("updated: %s" . (lambda (issue-alist) (let-alist issue-alist (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-"))))
