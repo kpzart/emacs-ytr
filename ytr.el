@@ -80,34 +80,34 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 (defvar ytr-issues-alist '() "Issues alist used for annotations")
 (defvar ytr-queries-alist '() "Queries alist used for annotations")
 
-(defvar ytr-capture-shortcode "" "Shortcode for org capture template")
+(defvar ytr-capture-issue-code "" "Issue Code for org capture template")
 (defvar ytr-capture-summary "" "Summary for org capture template")
 
 (defvar-local ytr-buffer-position nil "Buffer local var to store position")
 (defvar-local ytr-buffer-text nil "Buffer local var to store text")
 (defvar-local ytr-buffer-wconf nil "Buffer local var to store wconf")
 (defvar-local ytr-buffer-curlevel nil "Buffer local var to store curlevel")
-(defvar-local ytr-buffer-issue-id nil "Buffer local var to store issue-id")
-(defvar-local ytr-buffer-node-id nil "Buffer local var to store node-id")
+(defvar-local ytr-buffer-issue-code nil "Buffer local var to store issue-code")
+(defvar-local ytr-buffer-node-code nil "Buffer local var to store node-code")
 (defvar-local ytr-buffer-node-type nil "Buffer local var to store node-type")
 (defvar-local ytr-buffer-commit-type nil "Buffer local var to store commit-type")
 
 ;;;; urls
-(defun ytr-issue-url (shortcode)
-  "Return the URL for a issue given by shortcode"
-  (concat ytr-baseurl "/issue/" shortcode))
+(defun ytr-issue-url (issue-code)
+  "Return the URL for a issue given by issue-code"
+  (concat ytr-baseurl "/issue/" issue-code))
 
-(defun ytr-issue-comment-url (shortcode comment-id)
-  "Return URL for a issue given by shortcode with focus on comment with comment-id"
-  (concat ytr-baseurl "/issue/" shortcode "#focus=Comments-" comment-id ".0-0"))
+(defun ytr-issue-comment-url (issue-code node-code)
+  "Return URL for a issue given by issue-code with focus on comment with node-code"
+  (concat ytr-baseurl "/issue/" issue-code "#focus=Comments-" node-code ".0-0"))
 
 (defun ytr-query-url (query)
   "Return the URL for a query"
   (concat ytr-baseurl "/issues?q=" (url-hexify-string query)))
 
-;;;; read shortcode
-(defun ytr-read-shortcode-basic ()
-  "Return a shortcode from a query"
+;;;; read issue node codes
+(defun ytr-read-issue-code-basic ()
+  "Return an issue code from a query"
   (let* ((query (completing-read "Query: " ytr-queries nil nil))
          (issues-alist (ytr-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
@@ -118,7 +118,7 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 
 ;;;;; marginalia
 
-(add-to-list 'marginalia-annotator-registry '(ytr-shortcode ytr-annotate-shortcode builtin none))
+(add-to-list 'marginalia-annotator-registry '(ytr-issue-code ytr-annotate-issue-code builtin none))
 (add-to-list 'marginalia-annotator-registry '(ytr-query ytr-annotate-query builtin none))
 
 (defun ytr-completing-read-categorised (prompt choices category)
@@ -129,12 +129,12 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
                               (_
                                (all-completions str choices pred))))))
 
-(defun ytr-annotate-shortcode (cand)
-  "Annotate issue shortcode with some info"
-  (let* ((shortcode (car (split-string cand ":")))
+(defun ytr-annotate-issue-code (cand)
+  "Annotate issue-code with some info"
+  (let* ((issue-code (car (split-string cand ":")))
          (issue-alist (cl-find-if (lambda (elem)
-                                    (string= (alist-get 'idReadable elem) shortcode))
-                                  ytr-issues-alist))) ;; ytr-issues-alist comes from ytr-read-shortcode-annotated via dynamic binding!
+                                    (string= (alist-get 'idReadable elem) issue-code))
+                                  ytr-issues-alist))) ;; ytr-issues-alist comes from ytr-read-issue-code-annotated via dynamic binding!
     (let-alist issue-alist
       (marginalia--fields
        ;; (:left .summary :format " %s" :face 'marginalia-type)
@@ -154,7 +154,7 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
          (total (alist-get 'issues query-alist))
          (unresolved (seq-drop-while (lambda (issue) (alist-get 'resolved issue)) total))
          (mine (seq-take-while (lambda (issue) (string= ytr-user-full-name (ytr-get-customField-value issue "Assignee"))) unresolved))
-         ) ;; queries-alist comes from ytr-read-shortcode-annotated via dynamic binding!
+         ) ;; queries-alist comes from ytr-read-issue-code-annotated via dynamic binding!
     (marginalia--fields
      (name :truncate .5 :face 'marginalia-documentation)
      ((length total) :format "Total: %s" :truncate .2 :face 'marginalia-type)
@@ -162,10 +162,10 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
      ((length mine) :format "Mine: %s" :truncate .2 :face 'marginalia-type)
      )))
 
-(defconst ytr-issue-shortcode-pattern "[a-zA-Z]+-[0-9]+")
-(defconst ytr-comment-shortcode-pattern "#\\([0-9-]+\\)")
-(defconst ytr-issue-comment-shortcode-pattern (format "\\(%s\\)\\(?:%s\\)?" ytr-issue-shortcode-pattern ytr-comment-shortcode-pattern))
-(defconst ytr-issue-mandatory-comment-shortcode-pattern (format "\\(%s\\)%s" ytr-issue-shortcode-pattern ytr-comment-shortcode-pattern))
+(defconst ytr-issue-code-pattern "[a-zA-Z]+-[0-9]+")
+(defconst ytr-node-code-pattern "#\\([0-9-]+\\)")
+(defconst ytr-issue-node-code-pattern (format "\\(%s\\)\\(?:%s\\)?" ytr-issue-code-pattern ytr-node-code-pattern))
+(defconst ytr-issue-mandatory-node-code-pattern (format "\\(%s\\)%s" ytr-issue-code-pattern ytr-node-code-pattern))
 
 (defun ytr-delim-pattern (pattern)
   "Add string begin and string end delimiters to pattern"
@@ -175,16 +175,16 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
   "Add surroundings to pattern"
   (format "\\([^a-zA-Z0-9-#]\\)\\(%s\\)\\([^a-zA-Z0-9-#]\\)" pattern))
 
-(defun ytr-read-shortcode-annotated ()
-  "Return a shortcode from a query"
+(defun ytr-read-issue-code-annotated ()
+  "Return an issue-code from a query"
   (interactive)
   (let ((query (completing-read "Query: " ytr-queries nil nil)))
-    (if (string-match-p "^[a-zA-Z]+-[0-9]+$" query) query ;; if query is already a shortcode
+    (if (string-match-p "^[a-zA-Z]+-[0-9]+$" query) query ;; if query is already an issue-code
       (let ((ytr-issues-alist (ytr-retrieve-query-issues-alist query)))
         (if (length> ytr-issues-alist 0)
             (ytr-completing-read-categorised "Issue: "
                                              (mapcar (lambda (item) (alist-get 'idReadable item)) ytr-issues-alist)
-                                             'ytr-shortcode)
+                                             'ytr-issue-code)
           (user-error "Query returned empty results."))))))
 
 ;;;;; consult
@@ -195,19 +195,19 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
               (cl-find-if (lambda (elem) (string= (alist-get 'idReadable elem) (car (split-string cand ":")))) ytr-issues-alist)))
     (exit (quit-window))))
 
-(defun ytr-read-shortcode-from-query-consult (query)
-  "use consult to get the shortcode from a given query"
+(defun ytr-read-issue-code-from-query-consult (query)
+  "Use consult to get the issue code from a given QUERY"
   (let* ((issues-alist (ytr-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
                             (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
                           issues-alist)))
     (car (split-string (consult--read choices
-                                      :category 'ytr-shortcode
+                                      :category 'ytr-issue-code
                                       :state 'ytr-consult-state-function
                                       :require-match t
                                       :sort nil
                                       :history 'ytr-issue-history
-                                      ;; :add-history (list (ytr-guess-shortcode)) ;; klappt noch nicht
+                                      ;; :add-history (list (ytr-guess-issue-code)) ;; klappt noch nicht
                                       ;; :keymap tobedone
                                       )
                        ":"))))
@@ -237,93 +237,95 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
   "Use consult to read a query"
   (if ytr-use-saved-queries (ytr-read-query-saved-consult) (ytr-read-query-var-consult)))
 
-(defun ytr-read-shortcode-consult ()
-  "Use consult to read a shortcode"
-  (ytr-read-shortcode-from-query-consult (if ytr-use-saved-queries (ytr-read-query-saved-consult) (ytr-read-query-var-consult))))
+(defun ytr-read-issue-code-consult ()
+  "Use consult to read a issue code."
+  (ytr-read-issue-code-from-query-consult (if ytr-use-saved-queries (ytr-read-query-saved-consult) (ytr-read-query-var-consult))))
 
 ;;;;; customvar
 
-(defcustom ytr-read-shortcode-function 'ytr-read-shortcode-basic "Select Input Method to read a shortcode from user" :type 'function :group 'ytr :options '(ytr-read-shortcode-basic ytr-read-shortcode-annotated ytr-read-shortcode-consult))
+(defcustom ytr-read-issue-code-function 'ytr-read-issue-code-basic "Select Input Method to read an issue-code from user" :type 'function :group 'ytr :options '(ytr-read-issue-code-basic ytr-read-issue-code-annotated ytr-read-issue-code-consult))
 
-(defun ytr-read-shortcode ()
-  "Wrapper function to read shortcode from user"
-  (funcall ytr-read-shortcode-function))
+(defun ytr-read-issue-code ()
+  "Wrapper function to read an issue code from user"
+  (funcall ytr-read-issue-code-function))
 
-;;;; recognize shortcode
+;;;; Recognize issue node codes
 (add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9a-zA-Z#-" "" ""))
 
-(defun ytr-parse-shortcode-and-node-id (candidate)
-  "Parse string for and issue shortcode and a comment id if present"
-  (if (string-match (ytr-delim-pattern ytr-issue-comment-shortcode-pattern) candidate)
+(defun ytr-parse-issue-node-code (candidate)
+  "Parse string for an issue and a node code if present and return a cons
+(issue-code . node-code)."
+  (if (string-match (ytr-delim-pattern ytr-issue-node-code-pattern) candidate)
       (cons (match-string 1 candidate) (match-string 2 candidate))
     nil))
 
-(defun ytr-shortcode-and-comment-id-from-point ()
-  "Return the shortcode and optional the item id at point or nil if there is none."
-  (ytr-parse-shortcode-and-node-id (ffap-string-at-point 'ytr)))
+(defun ytr-issue-node-code-from-point ()
+  "Return the issue-node-code or issue-code at point or nil if there is none."
+  (ytr-parse-issue-node-code (ffap-string-at-point 'ytr)))
 
-(defun ytr-shortcode-from-point ()
-  "Return the shortcode at point or nil if there is none"
-  (car (ytr-shortcode-and-comment-id-from-point)))
+(defun ytr-issue-code-from-point ()
+  "Return the issue code at point or nil if there is none"
+  (car (ytr-issue-node-code-from-point)))
 
-(defun ytr-shortcode-and-comment-id-from-org-property ()
-  "Return the shortcode defined by an org property YTR_SHORTCODE or nil"
+(defun ytr-issue-node-cons-from-org-property ()
+  "Return the issue code defined by an org property YTR_ISSUE_CODE or nil"
   (if (derived-mode-p 'org-mode)
-      (let ((shortcode (org-entry-get (point) "YTR_SHORTCODE" t)))
-        (when shortcode (ytr-parse-shortcode-and-node-id shortcode)))
+      (let ((issue-code (org-entry-get (point) "YTR_ISSUE_CODE" t)))
+        (when issue-code (ytr-parse-issue-node-code issue-code)))
     nil))
 
-(defun ytr-shortcode-from-branch ()
-  "Return the shortcode from the name of the current git branch"
+(defun ytr-issue-code-from-branch ()
+  "Return the issue code from the name of the current git branch"
   (let ((branch-name (shell-command-to-string "git rev-parse --abbrev-ref HEAD")))
-    (if (string-match (format "^\\([a-zA-Z]+/\\)?\\(%s\\)[-_].*$" ytr-issue-shortcode-pattern) branch-name)
+    (if (string-match (format "^\\([a-zA-Z]+/\\)?\\(%s\\)[-_].*$" ytr-issue-code-pattern) branch-name)
         (match-string 2 branch-name))))
 
-(defun ytr-guess-shortcode ()
-  "Return a shortcode string from current context."
+(defun ytr-guess-issue-code ()
+  "Return a issue code from current context."
   (interactive)
-  (let ((issue (ytr-shortcode-from-point)))
-    (if issue issue
-      (let ((issue (ytr-shortcode-and-comment-id-from-org-property)))
-        (if issue (car issue)
-          (let ((issue (ytr-shortcode-from-branch)))
-            (if issue issue nil)))))))
+  (let ((issue-code (ytr-issue-code-from-point)))
+    (if issue-code issue-code
+      (let ((issue-node-cons (ytr-issue-node-cons-from-org-property)))
+        (if issue-node-cons (car issue-node-cons)
+          (let ((issue-code (ytr-issue-code-from-branch)))
+            (if issue-code issue-code nil)))))))
 
-(defun ytr-guess-shortcode-and-comment-id ()
-  "Return a cons cell from shortcode and comment id from current context."
-  (let ((issue-comment-ids (ytr-shortcode-and-comment-id-from-point)))
-    (if issue-comment-ids issue-comment-ids
-      (let ((issue (ytr-shortcode-and-comment-id-from-org-property)))
-        (if issue issue
-          (let ((issue (ytr-shortcode-from-branch)))
-            (if issue (cons issue nil) nil)))))))
+(defun ytr-guess-issue-node-cons ()
+  "Return a cons cell from issue code and node code from current context."
+  (interactive)
+  (let ((issue-node-cons (ytr-issue-node-code-from-point)))
+    (if issue-node-cons issue-node-cons
+      (let ((issue-node-cons (ytr-issue-node-cons-from-org-property)))
+        (if issue-node-cons issue-node-cons
+          (let ((issue-code (ytr-issue-code-from-branch)))
+            (if issue-code (cons issue-code nil) nil)))))))
 
-(defun ytr-guess-or-read-shortcode ()
-  "Guess shortcode on context or start a query."
-  (let ((guess (ytr-guess-shortcode)))
-    (if guess guess (ytr-read-shortcode)))
+(defun ytr-guess-or-read-issue-code ()
+  "Guess issue code on context or start a query."
+  (let ((guess (ytr-guess-issue-code)))
+    (if guess guess (ytr-read-issue-code)))
   )
 
-(defun ytr-guess-or-read-shortcode-and-comment-id ()
-  "Guess shortcode on context or start a query."
-  (let ((guess (ytr-guess-shortcode-and-comment-id)))
-    (if guess guess (cons (ytr-read-shortcode) nil))))
+(defun ytr-guess-or-read-issue-node-cons ()
+  "Guess issue code with node code on context or start a query."
+  (let ((guess (ytr-guess-issue-node-cons)))
+    (if guess guess (cons (ytr-read-issue-code) nil))))
 
 ;;;; embark
-(defvar-keymap embark-ytr-shortcode-actions
-  :doc "Keymap for actions for ytr shortcodes"
+(defvar-keymap embark-ytr-issue-node-code-actions
+  :doc "Keymap for actions for ytr issue node code"
   :parent embark-general-map
   "w" #'ytr-embark-browse
   "o" #'ytr-embark-org
   "p" #'ytr-embark-sneak
   "u" #'ytr-embark-copy-url
-  "y" #'ytr-embark-copy-shortcode
-  "i" #'ytr-embark-insert-shortcode
-  "m" #'ytr-embark-message-shortcode
+  "y" #'ytr-embark-copy-issue-node-code
+  "i" #'ytr-embark-insert-issue-node-code
+  "m" #'ytr-embark-message-issue-node-code
   "l" #'ytr-embark-org-link-heading
   "c" #'ytr-embark-org-capture)
 
-(add-to-list 'embark-keymap-alist '(ytr-shortcode . embark-ytr-shortcode-actions))
+(add-to-list 'embark-keymap-alist '(ytr-issue-node-code . embark-ytr-issue-node-code-actions))
 
 (defvar-keymap embark-ytr-query-actions
   :doc "Keymap for actions for ytr queries"
@@ -332,19 +334,19 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 
 (add-to-list 'embark-keymap-alist '(ytr-query . embark-ytr-query-actions))
 
-(defun ytr-embark-shortcode-target-finder ()
-  "Find Shortcodes for embark"
+(defun ytr-embark-issue-node-code-target-finder ()
+  "Find issue code and node code for embark"
   (save-excursion
     (let* ((start (progn (skip-chars-backward "[:alnum:]-#") (point)))
            (end (progn (skip-chars-forward "[:alnum:]-#") (point)))
            (str (buffer-substring-no-properties start end)))
       (save-match-data
-        (when (string-match-p (ytr-delim-pattern ytr-issue-comment-shortcode-pattern) str)
-          `(ytr-shortcode
+        (when (string-match-p (ytr-delim-pattern ytr-issue-node-code-pattern) str)
+          `(ytr-issue-node-code
             ,str
             ,start . ,end))))))
 
-(add-to-list 'embark-target-finders 'ytr-embark-shortcode-target-finder)
+(add-to-list 'embark-target-finders 'ytr-embark-issue-node-code-target-finder)
 
 ;;;; history
 (defun ytr-retrieve-history-issues-alist ()
@@ -353,9 +355,9 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
       (setq result (cons (ytr-retrieve-issue-alist elt) result))))
   )
 
-(defun ytr-add-issue-to-history (shortcode)
-  (delete shortcode ytr-issue-history)
-  (push shortcode ytr-issue-history)
+(defun ytr-add-issue-to-history (issue-node-code)
+  (delete issue-node-code ytr-issue-history)
+  (push issue-node-code ytr-issue-history)
   )
 
 ;;;; api
@@ -425,29 +427,29 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
   "Retrieve list of saved queries"
   (ytr-request "GET" (concat ytr-baseurl "/api/savedQueries?fields=name,query,owner(fullName),issues(resolved,customFields(name,value(name)))")))
 
-(defun ytr-retrieve-issue-alist (issue-id)
+(defun ytr-retrieve-issue-alist (issue-code)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-request "GET" (concat ytr-baseurl "/api/issues/" issue-id "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType,comment(id))")))
+  (ytr-request "GET" (concat ytr-baseurl "/api/issues/" issue-code "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType,comment(id))")))
 
-(defun ytr-retrieve-issue-comment-alist (issue-id comment-id)
+(defun ytr-retrieve-issue-comment-alist (issue-code node-code)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-request "GET" (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)")))
+  (ytr-request "GET" (concat ytr-baseurl "/api/issues/" issue-code "/comments/" node-code "?fields=id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)")))
 
-(defun ytr-send-new-comment-alist (issue-id alist)
-  "Send the information in ALIST as a new comment for ticket with id ISSUE-ID"
-  (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue-id "/comments/") (json-encode alist)))
+(defun ytr-send-new-comment-alist (issue-code alist)
+  "Send the information in ALIST as a new comment for ticket with id ISSUE-CODE"
+  (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue-code "/comments/") (json-encode alist)))
 
-(defun ytr-send-issue-comment-alist (issue-id comment-id alist)
+(defun ytr-send-issue-comment-alist (issue-code node-code alist)
   "Send information in ALIST for a remote update of an issue comment with id ISSUE"
-  (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue-id "/comments/" comment-id "?fields=text") (json-encode alist)))
+  (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue-code "/comments/" node-code "?fields=text") (json-encode alist)))
 
 (defun ytr-send-issue-alist (issue alist)
   "Send the information in ALIST for a remote update of issue with id ISSUE"
   (ytr-request "POST" (concat ytr-baseurl "/api/issues/" issue "?fields=description") (json-encode alist)))
 
-(defun ytr-send-as-attachments (paths issue-id &optional comment-id)
-  "Attach the file to the ticket with id ISSUE-ID"
-  (ytr-request-upload (concat ytr-baseurl "/api/issues/" issue-id (if comment-id (format "/comments/%s" comment-id) "") "/attachments?fields=id,name") paths))
+(defun ytr-send-as-attachments (paths issue-code &optional node-code)
+  "Attach the file to the ticket with id ISSUE-CODE"
+  (ytr-request-upload (concat ytr-baseurl "/api/issues/" issue-code (if node-code (format "/comments/%s" node-code) "") "/attachments?fields=id,name") paths))
 
 
 (defun ytr-get-customField-value (issue-alist field-name)
@@ -504,7 +506,7 @@ conversion loss."
   (let-alist issue-alist
     (insert (format "%s %s: %s\n\n" (make-string level ?*) .idReadable .summary))
     (open-line 1)  ;; need this to ensure props go to correct heading
-    (org-set-property "YTR_SHORTCODE" .idReadable)
+    (org-set-property "YTR_ISSUE_CODE" .idReadable)
     (org-set-property "YTR_NODE_TYPE" "issue")
     (kill-whole-line)  ;; kill line we just opened
     (insert (format "%s Links\n\n" (make-string (+ 1 level) ?*)))
@@ -541,10 +543,10 @@ conversion loss."
     ;; do the description
     (ytr-org-insert-node .description (+ 1 level) 'description .idReadable .id (alist-get 'fullName .reporter) .created .updated .attachments)
     ;; do the comments
-    (let ((shortcode .idReadable))
+    (let ((issue-code .idReadable))
       (mapc (lambda (comment-alist)
               (let-alist comment-alist
-                (ytr-org-insert-node .text (+ 1 level) 'comment shortcode .id (alist-get 'fullName .author) .created .updated .attachments)))
+                (ytr-org-insert-node .text (+ 1 level) 'comment issue-code .id (alist-get 'fullName .author) .created .updated .attachments)))
             .comments))
     ;; postprocess
     (org-unindent-buffer)))
@@ -558,7 +560,7 @@ conversion loss."
         (erase-buffer)
         (org-mode)
         (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
-        (org-set-property "YTR_SHORTCODE" (format "%s" .idReadable))
+        (org-set-property "YTR_ISSUE_CODE" (format "%s" .idReadable))
         (insert "#+COLUMNS: %50ITEM(Title) %16YTR_CREATED_AT(Created) %16YTR_UPDATED_AT(Updated) %20YTR_AUTHOR(Author) %12YTR_NODE_TYPE(Type)\n")
         (ytr-insert-issue-alist-as-org issue-alist 1)
         (switch-to-buffer bufname)))))
@@ -597,7 +599,7 @@ conversion loss."
              (new-heading (concat (make-string new-level ?*) " ")))
         (replace-match new-heading)))))
 
-(defun ytr-org-insert-node (content level type issue-id node-id author created updated attachments)
+(defun ytr-org-insert-node (content level type issue-code node-code author created updated attachments)
   "Insert a node at point.
 
 Level is that of the node, type is generic, author is a string, created is a
@@ -613,15 +615,15 @@ long value"
       (goto-char start)
       (org-set-tags (list (capitalize type-string))))
     (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
-    (org-set-property "YTR_SHORTCODE" (format "%s#%s" issue-id node-id))
+    (org-set-property "YTR_ISSUE_CODE" (format "%s#%s" issue-code node-code))
     (org-set-property "YTR_NODE_TYPE" type-string)
     (org-set-property "YTR_CREATED_AT" (format-time-string "%Y-%m-%d %H:%M" (/ created 1000)))
     (when updated (org-set-property "YTR_UPDATED_AT" (format-time-string "%Y-%m-%d %H:%M" (/ updated 1000))))
     (org-set-property "YTR_AUTHOR" author)
     (kill-whole-line)  ;; kill line we just opened
     (when content (insert (ytr-md-to-org content (+ 1 level))))
-    ;; (unless (string= issue-id (org-entry-get (point) "YTR_SHORTCODE" t))  ;; dont see the sense of those lines, keep a while commented
-    ;;   (org-set-property "YTR_SHORTCODE" issue-id))
+    ;; (unless (string= issue-code (org-entry-get (point) "YTR_ISSUE_CODE" t))  ;; dont see the sense of those lines, keep a while commented
+    ;;   (org-set-property "YTR_ISSUE_CODE" issue-code))
     (when (/= (length attachments) 0)
       (save-excursion
         (goto-char start)
@@ -676,8 +678,8 @@ nil."
 (defun ytr-commit-new-comment ()
   "Commit buffer content as a new comment"
   (interactive)
-  (let ((new-node-id (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-id `((text . ,(buffer-string))))))
-        (issue-id ytr-buffer-issue-id) ;; These vars are buffer local and we are going to switch buffer
+  (let ((new-node-code (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-code `((text . ,(buffer-string))))))
+        (issue-code ytr-buffer-issue-code) ;; These vars are buffer local and we are going to switch buffer
         (curlevel ytr-buffer-curlevel)
         (text ytr-buffer-text)
         (position ytr-buffer-position)
@@ -686,70 +688,70 @@ nil."
     (kill-buffer buffer)
     (goto-char position)
     (set-mark (+ position (length text)))
-    (ytr-add-issue-to-history issue-id)
-    (unless new-node-id (user-error "No node id retrieved"))
-    (message "New comment created on %s with node id %s." issue-id new-node-id)
-    (ytr-send-attachments-action (cons issue-id new-node-id))
+    (ytr-add-issue-to-history issue-code)
+    (unless new-node-code (user-error "No node code retrieved"))
+    (message "New comment created on %s with node code %s." issue-code new-node-code)
+    (ytr-send-attachments-action (cons issue-code new-node-code))
     (cl-case ytr-new-comment-behavior
       (keep (deactivate-mark))
       (keep-content
-       (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
+       (let-alist (ytr-retrieve-issue-comment-alist issue-code new-node-code)
          (deactivate-mark)
          (when (looking-at-p "\*+ ")
            (insert "*")
            (forward-char -1))
-         (ytr-org-insert-node nil curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .updated .attachments)
+         (ytr-org-insert-node nil curlevel 'comment issue-code new-node-code (alist-get 'fullName .author) .created .updated .attachments)
          (goto-char position)
          (org-set-property "YTR_CONTENT_HASH" (if .text (sha1 .text) ""))))
       (kill (kill-region (point) (mark)))
       (fetch
-       (let-alist (ytr-retrieve-issue-comment-alist issue-id new-node-id)
+       (let-alist (ytr-retrieve-issue-comment-alist issue-code new-node-code)
          (kill-region (point) (mark))
-         (ytr-org-insert-node .text curlevel 'comment issue-id new-node-id (alist-get 'fullName .author) .created .updated .attachments)
+         (ytr-org-insert-node .text curlevel 'comment issue-code new-node-code (alist-get 'fullName .author) .created .updated .attachments)
          (goto-char position))
        ))
-    (kill-new (format "%s#%s" issue-id new-node-id))
-    (ytr-shortcode-buttonize-buffer)))
+    (kill-new (format "%s#%s" issue-code new-node-code))
+    (ytr-issue-node-code-buttonize-buffer)))
 
 (defun ytr-commit-update-node ()
   "Commit the buffer to youtrack to update a node"
   (interactive)
-  (let ((issue-id ytr-buffer-issue-id)
-        (node-id ytr-buffer-node-id)
+  (let ((issue-code ytr-buffer-issue-code)
+        (node-code ytr-buffer-node-code)
         (node-type ytr-buffer-node-type)
         (position ytr-buffer-position)
         (buffer (buffer-name)))
     (cl-case ytr-buffer-node-type
-      (description (ytr-send-issue-alist ytr-buffer-issue-id `((description . ,(buffer-string)))))
-      (comment (ytr-send-issue-comment-alist ytr-buffer-issue-id ytr-buffer-node-id `((text . ,(buffer-string)))))
+      (description (ytr-send-issue-alist ytr-buffer-issue-code `((description . ,(buffer-string)))))
+      (comment (ytr-send-issue-comment-alist ytr-buffer-issue-code ytr-buffer-node-code `((text . ,(buffer-string)))))
       (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
     (set-window-configuration ytr-buffer-wconf)
     (kill-buffer buffer)
     (goto-char position)
-    (ytr-add-issue-to-history issue-id)
+    (ytr-add-issue-to-history issue-code)
     (message "Node successfully updated")
-    (ytr-send-attachments-action (cons issue-id (when (eq node-type 'comment) node-id)))
+    (ytr-send-attachments-action (cons issue-code (when (eq node-type 'comment) node-code)))
     (cl-case ytr-update-node-behavior
       (keep)
       (keep-content
        (org-set-property "YTR_CONTENT_HASH"
                          (let ((content (cl-case node-type
-                                          (description (alist-get '.description (ytr-retrieve-issue-alist issue-id)))
-                                          (comment (alist-get '.text (ytr-retrieve-issue-comment-alist issue-id node-id))))))
+                                          (description (alist-get '.description (ytr-retrieve-issue-alist issue-code)))
+                                          (comment (alist-get '.text (ytr-retrieve-issue-comment-alist issue-code node-code))))))
                            (if content (sha1 content) ""))))
       (kill (org-cut-subtree))
       (fetch
        (ytr-fetch-remote-node)
        ))
-    (kill-new (format "%s#%s" issue-id node-id))
-    (ytr-shortcode-buttonize-buffer)
+    (kill-new (format "%s#%s" issue-code node-code))
+    (ytr-issue-node-code-buttonize-buffer)
     ))
 
 (defun ytr-perform-markdown-replacements (attach-dir)
   (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
   (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\(?:png\\|jpeg\\|jpg\\)\\))" ytr-baseurl) "![](\\1)" (point-min) (point-max))
   (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "[\\1](\\2)" (point-min) (point-max))
-  (replace-regexp-in-region (format "\\([^[#a-zA-Z0-9-]\\|^\\)%s\\([^]#a-zA-Z0-9-]\\|$\\)" ytr-issue-mandatory-comment-shortcode-pattern)
+  (replace-regexp-in-region (format "\\([^[#a-zA-Z0-9-]\\|^\\)%s\\([^]#a-zA-Z0-9-]\\|$\\)" ytr-issue-mandatory-node-code-pattern)
                             (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
   (replace-regexp-in-region (format "](file://%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
   (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
@@ -768,18 +770,18 @@ nil."
   (let ((position (point))
         (text (buffer-substring-no-properties (region-beginning) (region-end)))
         (wconf (current-window-configuration))
-        (issue-id (ytr-guess-or-read-shortcode))
+        (issue-code (ytr-guess-or-read-issue-code))
         (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
         (attach-dir (or (org-attach-dir) "")))
     (org-gfm-export-as-markdown nil nil)
     (ytr-perform-markdown-replacements attach-dir)
     (ytr-commit-new-comment-mode)
-    (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-id)
+    (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-code)
     (setq-local ytr-buffer-position position
                 ytr-buffer-text text
                 ytr-buffer-wconf wconf
                 ytr-buffer-curlevel curlevel
-                ytr-buffer-issue-id issue-id
+                ytr-buffer-issue-code issue-code
                 ytr-buffer-node-type 'comment
                 ytr-buffer-commit-type 'create)))
 
@@ -813,12 +815,12 @@ nil."
   "Update a node on remote side after editing locally"
   (interactive)
   (let* ((type (or (ytr-find-node) (user-error "Could not find a node to update")))
-         (issue-node-ids (ytr-shortcode-and-comment-id-from-org-property))
-         (issue-id (car issue-node-ids))
-         (node-id (cdr issue-node-ids))
+         (issue-node-cons (ytr-issue-node-cons-from-org-property))
+         (issue-code (car issue-node-cons))
+         (node-code (cdr issue-node-cons))
          (content (cl-case type
-                    (description (alist-get 'description (ytr-retrieve-issue-alist issue-id)))
-                    (comment (alist-get 'text (ytr-retrieve-issue-comment-alist issue-id node-id)))
+                    (description (alist-get 'description (ytr-retrieve-issue-alist issue-code)))
+                    (comment (alist-get 'text (ytr-retrieve-issue-comment-alist issue-code node-code)))
                     (t (user-error (format "Unknown node type: %s" type)))))
          (remote-hash (if content (sha1 content) ""))
          (local-hash (org-entry-get (point) "YTR_CONTENT_HASH" t))
@@ -830,13 +832,13 @@ nil."
     (org-gfm-export-as-markdown nil t)
     (ytr-perform-markdown-replacements attach-dir)
     (ytr-commit-update-node-mode)
-    (message "Update %s%s on issue %s" type (if (eq type 'comment) (format " with ID %s" node-id) "") issue-id)
+    (message "Update %s%s on issue %s" type (if (eq type 'comment) (format " with ID %s" node-code) "") issue-code)
     (setq-local ytr-buffer-position position
                 ytr-buffer-wconf wconf
                 ytr-buffer-commit-type 'update
                 ytr-buffer-node-type type
-                ytr-buffer-issue-id issue-id
-                ytr-buffer-node-id node-id)))
+                ytr-buffer-issue-code issue-code
+                ytr-buffer-node-code node-code)))
 
 (defun ytr-send-node ()
   "Create a new comment or update the node, depending on context."
@@ -850,12 +852,12 @@ nil."
   (interactive)
   (save-excursion
     (let* ((type (or (ytr-find-node) (user-error "Could not find a node to fetch")))
-           (issue-node-ids (ytr-shortcode-and-comment-id-from-org-property))
-           (issue-id (car issue-node-ids))
-           (node-id (cdr issue-node-ids))
+           (issue-node-cons (ytr-issue-node-cons-from-org-property))
+           (issue-code (car issue-node-cons))
+           (node-code (cdr issue-node-cons))
            (content-alist (cl-case type
-                            (comment (ytr-retrieve-issue-comment-alist issue-id node-id))
-                            (t (ytr-retrieve-issue-alist issue-id))
+                            (comment (ytr-retrieve-issue-comment-alist issue-code node-code))
+                            (t (ytr-retrieve-issue-alist issue-code))
                             ))
            (curlevel (org-current-level)))
       (let ((inhibit-read-only t)
@@ -863,29 +865,29 @@ nil."
         (org-cut-subtree)
         (cl-case type
           (description (let-alist content-alist
-                         (ytr-org-insert-node .description curlevel 'description issue-id node-id (alist-get 'fullName .reporter) .created .updated .attachments)))
+                         (ytr-org-insert-node .description curlevel 'description issue-code node-code (alist-get 'fullName .reporter) .created .updated .attachments)))
           (comment (let-alist content-alist
-                     (ytr-org-insert-node .text curlevel 'comment issue-id node-id (alist-get 'fullName .author) .created .updated .attachments)))
+                     (ytr-org-insert-node .text curlevel 'comment issue-code node-code (alist-get 'fullName .author) .created .updated .attachments)))
           (issue (ytr-insert-issue-alist-as-org content-alist curlevel))
           (t (user-error "Bad node type %s" type)))))))
 
-(defun ytr-org-action (issue-node-ids)
+(defun ytr-org-action (issue-node-cons)
   ""
-  (let* ((shortcode (car issue-node-ids))
-         (comment-id (cdr issue-node-ids)))
-    (ytr-issue-alist-to-org-buffer (ytr-retrieve-issue-alist shortcode))
+  (let* ((issue-code (car issue-node-cons))
+         (node-code (cdr issue-node-cons)))
+    (ytr-issue-alist-to-org-buffer (ytr-retrieve-issue-alist issue-code))
     (org-mode)
     (read-only-mode 1)
-    (ytr-shortcode-buttonize-buffer)
+    (ytr-issue-node-code-buttonize-buffer)
     (goto-char (point-min))
-    (when comment-id
-      (search-forward-regexp (format ":YTR_SHORTCODE: *%s#%s" shortcode comment-id) nil t)
+    (when node-code
+      (search-forward-regexp (format ":YTR_ISSUE_CODE: *%s#%s" issue-code node-code) nil t)
       (org-back-to-heading))))
 
-(defun ytr-org-link-heading-action (issue-comment-ids)
-  "Set Property YTR_SHORTCODE on org heading and append tag YTR"
+(defun ytr-org-link-heading-action (issue-node-cons)
+  "Set Property YTR_ISSUE_CODE on org heading and append tag YTR"
   (save-excursion
-    (org-set-property "YTR_SHORTCODE" (car issue-comment-ids))
+    (org-set-property "YTR_ISSUE_CODE" (car issue-node-cons))
     (org-back-to-heading)
     (let ((tags (org-get-tags)))
       (if (member "YTR" tags) nil (org-set-tags (append (list "YTR") tags))))))
@@ -904,7 +906,7 @@ nil."
           issues-alist)
     (switch-to-buffer bufname)))
 
-(defun ytr-send-attachments-action (issue-node-ids)
+(defun ytr-send-attachments-action (issue-node-cons)
   "Send the attachments at org heading to issue or node and remove them locally."
   (when (and (org-attach-dir) (org-attach-file-list (org-attach-dir)))
     (let* ((paths (mapcar (lambda (filename)
@@ -913,7 +915,7 @@ nil."
            (size (apply '+ (mapcar (lambda (path) (nth 7 (file-attributes path))) paths))))
       (if (y-or-n-p (format "Upload %s files with total size %s? " (length paths) (file-size-human-readable size)))
           (progn
-            (ytr-send-as-attachments paths (car issue-node-ids) (cdr issue-node-ids))
+            (ytr-send-as-attachments paths (car issue-node-cons) (cdr issue-node-cons))
             (when (y-or-n-p "Delete attachments after uploading? ")
               (org-attach-delete-all t)
               (message "Attachments deleted.")))
@@ -973,11 +975,11 @@ which receives as argument den issue-alist."
       (princ "\n------------------------\n")
       (princ .description))))
 
-(defun ytr-sneak-window-comment (issue-alist comment-id)
+(defun ytr-sneak-window-comment (issue-alist node-code)
   "Display a side window with the description and basic information on the comment."
   (with-output-to-temp-buffer "*ytr-describe-comment*"
     (let-alist (cl-find-if (lambda (elem)
-                             (string= (alist-get 'id elem) comment-id))
+                             (string= (alist-get 'id elem) node-code))
                            (alist-get 'comments issue-alist))
       ;; comments(id,text,created,author(login,fullName))
       (princ (format "Comment for %s: %s\n" (alist-get 'idReadable issue-alist) (alist-get 'summary issue-alist)))
@@ -994,53 +996,54 @@ which receives as argument den issue-alist."
       (princ "\n------------------------\n")
       (princ .text))))
 
-(defun ytr-sneak-action (issue-node-ids)
+(defun ytr-sneak-action (issue-node-cons)
   "Display a side window with some basic information on issue and comment."
-  (let* ((shortcode (car issue-node-ids))
-         (comment-id (cdr issue-node-ids))
-         (issue-alist (ytr-retrieve-issue-alist shortcode)))
+  (let* ((issue-code (car issue-node-cons))
+         (node-code (cdr issue-node-cons))
+         (issue-alist (ytr-retrieve-issue-alist issue-code)))
     (ytr-sneak-window-issue issue-alist)
-    (when comment-id (ytr-sneak-window-comment issue-alist comment-id))))
+    (when node-code (ytr-sneak-window-comment issue-alist node-code))))
 
 ;;;; Copy URL
 
-(defun ytr-url (issue-node-ids)
-  "Get the url for issue with comment id"
-  (let* ((shortcode (car issue-node-ids))
-         (comment-id (cdr issue-node-ids)))
-    (if comment-id
-        (ytr-issue-comment-url shortcode comment-id)
-      (ytr-issue-url shortcode))))
+(defun ytr-url (issue-node-cons)
+  "Get the url for issue with comment code"
+  (let* ((issue-code (car issue-node-cons))
+         (node-code (cdr issue-node-cons)))
+    (if node-code
+        (ytr-issue-comment-url issue-code node-code)
+      (ytr-issue-url issue-code))))
 
-(defun ytr-copy-url-action (issue-node-ids)
+(defun ytr-copy-url-action (issue-node-cons)
   ""
-  (let ((url (ytr-url issue-node-ids)))
+  (let ((url (ytr-url issue-node-cons)))
     (message url)
     (kill-new url)))
 
-;;;; Get Shortcode
-(defun ytr-shortcode-action (issue-node-ids)
-  "Return a string representing shortcode and comment id."
-  (if (cdr issue-node-ids)
-      (format "%s#%s" (car issue-node-ids) (cdr issue-node-ids))
-    (car issue-node-ids)))
+;;;; Get Issue Node Codes
+(defun ytr-issue-node-code-action (issue-node-cons)
+  "Return a string representing issue and node code."
+  (if (cdr issue-node-cons)
+      (format "%s#%s" (car issue-node-cons) (cdr issue-node-cons))
+    (car issue-node-cons)))
 
-(defun ytr-copy-shortcode-action (issue-node-ids)
-  "Put a string for shortcode and comment id on kill ring."
-  (kill-new (ytr-shortcode-action issue-node-ids)))
+(defun ytr-copy-issue-node-code-action (issue-node-cons)
+  "Put a string for issue and node code on kill ring."
+  (kill-new (ytr-issue-node-code-action issue-node-cons)))
 
-(defun ytr-insert-shortcode-action (issue-node-ids)
-  "Insert a string for shortcode and comment id."
-  (insert (ytr-shortcode-action issue-node-ids)))
+(defun ytr-insert-issue-node-code-action (issue-node-cons)
+  "Insert a string for issue and node code."
+  (insert (ytr-issue-node-code-action issue-node-cons)))
 
-(defun ytr-message-shortcode-action (issue-node-ids)
-  "Echo shortcode and comment id in message area."
-  (message (ytr-shortcode-action issue-node-ids)))
+(defun ytr-message-issue-node-code-action (issue-node-cons)
+  "Echo issue and node code in message area."
+  (message (ytr-issue-node-code-action issue-node-cons)))
+
 ;;;; Open in browser
 
-(defun ytr-browse-action (issue-node-ids)
+(defun ytr-browse-action (issue-node-cons)
   ""
-  (browse-url (ytr-url issue-node-ids)))
+  (browse-url (ytr-url issue-node-cons)))
 
 (defun ytr-read-refine-browse ()
   "Edit a predefined query to find an issue and open it in the browser"
@@ -1073,41 +1076,41 @@ which receives as argument den issue-alist."
 ;;;; Capture
 (defcustom ytr-capture-key "" "Key for you special template to capture ytr proxy issues" :type 'string :group 'ytr)
 
-(defun ytr-capture-action (issue-comment-ids)
+(defun ytr-capture-action (issue-node-cons)
   "Capture a proxy org task that references an issue on ytr"
-  (let-alist (ytr-retrieve-issue-alist (car issue-comment-ids))
+  (let-alist (ytr-retrieve-issue-alist (car issue-node-cons))
     (setq ytr-capture-summary .summary)
-    (setq ytr-capture-shortcode .idReadable)
+    (setq ytr-capture-issue-code .idReadable)
     (org-capture nil ytr-capture-key)
-    (ytr-org-link-heading-action issue-comment-ids)))
+    (ytr-org-link-heading-action issue-node-cons)))
 
 ;;;; actions
 (defmacro ytr-define-dart-action (name action)
-  `(defun ,(intern (format "ytr-dart-%s" name)) (shortcode-node)
-     ,(format "Like ytr-%s but with simple prompt for shortcode.\n It may have a node id." name)
-     (interactive "sShortcode (may also have comment id): ")
-     (funcall ,action (ytr-parse-shortcode-and-node-id shortcode-node))))
+  `(defun ,(intern (format "ytr-dart-%s" name)) (issue-node-code)
+     ,(format "Like ytr-%s but with simple prompt for issue-node-code.\n It may have a node code." name)
+     (interactive "sIssue Code (may also have Node Code): ")
+     (funcall ,action (ytr-parse-issue-node-code issue-node-code))))
 
 (defmacro ytr-define-embark-action (name action)
   `(defun ,(intern (format "ytr-embark-%s" name)) (cand)
-     ,(format "Like ytr-dart-%s but cand consists of shortcode and summary" name)
-     (funcall ,action (ytr-parse-shortcode-and-node-id (car (split-string cand ":"))))))
+     ,(format "Like ytr-dart-%s but cand consists of issue code and summary" name)
+     (funcall ,action (ytr-parse-issue-node-code (car (split-string cand ":"))))))
 
 (defmacro ytr-define-base-action (name action)
-  `(defun ,(intern (format "ytr-%s" name)) (shortcode)
+  `(defun ,(intern (format "ytr-%s" name)) (issue-code)
      ,(format "Retrieve an issue from user input and call the %s action on it" name)
      (interactive (list
                    (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
-                     (ytr-read-shortcode))))
-     (ytr-add-issue-to-history shortcode)
-     (funcall ,action (cons shortcode nil))))
+                     (ytr-read-issue-code))))
+     (ytr-add-issue-to-history issue-code)
+     (funcall ,action (cons issue-code nil))))
 
 (defmacro ytr-define-smart-action (name action)
-  `(defun ,(intern (format "ytr-smart-%s" name)) (issue-comment-ids)
+  `(defun ,(intern (format "ytr-smart-%s" name)) (issue-node-code)
      ,(format "Guess an issue by context and call the %s action on it" name)
-     (interactive (list (ytr-guess-or-read-shortcode-and-comment-id)))
-     (ytr-add-issue-to-history (car issue-comment-ids))
-     (funcall ,action issue-comment-ids)))
+     (interactive (list (ytr-guess-or-read-issue-node-cons)))
+     (ytr-add-issue-to-history (car issue-node-code))
+     (funcall ,action issue-node-code)))
 
 (defmacro ytr-define-action (name action)
   `(progn
@@ -1116,10 +1119,10 @@ which receives as argument den issue-alist."
      (ytr-define-base-action ,name ,action)
      (ytr-define-smart-action ,name ,action)))
 
-(defun ytr-message-action (ids) (message "Issue %s, Node ID %s" (car ids) (cdr ids)) )
-(ytr-define-action "message-shortcode" 'ytr-message-shortcode-action)
-(ytr-define-action "copy-shortcode" 'ytr-copy-shortcode-action)
-(ytr-define-action "insert-shortcode" 'ytr-insert-shortcode-action)
+(defun ytr-message-action (issue-node-cons) (message "Issue Code%s, Node Code %s" (car issue-node-cons) (cdr issue-node-cons)) )
+(ytr-define-action "message-issue-node-code" 'ytr-message-issue-node-code-action)
+(ytr-define-action "copy-issue-node-code" 'ytr-copy-issue-node-code-action)
+(ytr-define-action "insert-issue-node-code" 'ytr-insert-issue-node-code-action)
 (ytr-define-action "browse" 'ytr-browse-action)
 (ytr-define-action "org" 'ytr-org-action)
 (ytr-define-action "sneak" 'ytr-sneak-action)
@@ -1130,23 +1133,23 @@ which receives as argument den issue-alist."
 
 ;;;; Issue buttons
 
-(define-button-type 'shortcode-button
+(define-button-type 'ytr-issue-node-code-button
   'follow-link t
-  'action #'ytr-on-shortcode-button)
+  'action #'ytr-on-issue-node-code-button)
 
-(defun ytr-on-shortcode-button (button)
-  (let ((issue-comment-ids (ytr-parse-shortcode-and-node-id (buffer-substring (button-start button) (button-end button)))))
-    (ytr-dart-browse issue-comment-ids)))
+(defun ytr-on-issue-node-code-button (button)
+  (let ((issue-node-cons (ytr-parse-issue-node-code (buffer-substring (button-start button) (button-end button)))))
+    (ytr-dart-browse issue-node-cons)))
 
-(defun ytr-shortcode-buttonize-buffer ()
-  "turn all issue shortcodes into buttons"
+(defun ytr-issue-node-code-buttonize-buffer ()
+  "Turn all issue-node-codes into buttons"
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    (while (re-search-forward (ytr-surrounded-pattern ytr-issue-comment-shortcode-pattern) nil t)
-      (make-button (match-beginning 2) (match-end 2) :type 'shortcode-button))))
+    (while (re-search-forward (ytr-surrounded-pattern ytr-issue-node-code-pattern) nil t)
+      (make-button (match-beginning 2) (match-end 2) :type 'ytr-issue-node-code-button))))
 
-(add-hook 'org-mode-hook 'ytr-shortcode-buttonize-buffer)
+(add-hook 'org-mode-hook 'ytr-issue-node-code-buttonize-buffer)
 
 ;;;; helm
 (if (require 'helm nil t)
@@ -1167,13 +1170,13 @@ which receives as argument den issue-alist."
                                  "ytr-issues"
                                :candidates choices
                                :action '(("Open in browser" . (lambda (issue-alist)
-                                                                (let ((shortcode (alist-get 'idReadable issue-alist)))
-                                                                  (ytr-add-issue-to-history shortcode)
-                                                                  (browse-url (ytr-issue-url shortcode)))))
+                                                                (let ((issue-code (alist-get 'idReadable issue-alist)))
+                                                                  (ytr-add-issue-to-history issue-code)
+                                                                  (browse-url (ytr-issue-url issue-code)))))
                                          ("Open in org buffer" . (lambda (issue-alist)
-                                                                   (let ((shortcode (alist-get 'idReadable issue-alist)))
-                                                                     (ytr-add-issue-to-history shortcode)
-                                                                     (ytr-dart-org shortcode)))))
+                                                                   (let ((issue-code (alist-get 'idReadable issue-alist)))
+                                                                     (ytr-add-issue-to-history issue-code)
+                                                                     (ytr-dart-org issue-code)))))
                                :must-match 'ignore
                                :persistent-action 'ytr-sneak-window-issue
                                :keymap (let ((map (make-sparse-keymap)))
