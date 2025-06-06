@@ -691,7 +691,8 @@ nil."
     (ytr-add-issue-to-history issue-code)
     (unless new-node-code (user-error "No node code retrieved"))
     (message "New comment created on %s with node code %s." issue-code new-node-code)
-    (ytr-send-attachments-action (cons issue-code new-node-code))
+    (if (derived-mode-p 'org-mode)
+        (ytr-send-attachments-action (cons issue-code new-node-code)))
     (cl-case ytr-new-comment-behavior
       (keep (deactivate-mark))
       (keep-content
@@ -775,6 +776,25 @@ nil."
         (attach-dir (or (org-attach-dir) "")))
     (org-gfm-export-as-markdown nil nil)
     (ytr-perform-markdown-replacements attach-dir)
+    (ytr-commit-new-comment-mode)
+    (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-code)
+    (setq-local ytr-buffer-position position
+                ytr-buffer-text text
+                ytr-buffer-wconf wconf
+                ytr-buffer-curlevel curlevel
+                ytr-buffer-issue-code issue-code
+                ytr-buffer-node-type 'comment
+                ytr-buffer-commit-type 'create)))
+
+(defun ytr-quick-comment-action (issue-node-cons)
+  "Open a markdown buffer to write a quick comment."
+  (let ((issue-code (car issue-node-cons))
+        (position (point))
+        (text "")
+        (wconf (current-window-configuration))
+        (curlevel 0)
+        (ytr-new-comment-behavior 'keep))
+    (switch-to-buffer-other-window (get-buffer-create "*YTR Compose Comment*"))
     (ytr-commit-new-comment-mode)
     (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-code)
     (setq-local ytr-buffer-position position
@@ -1130,6 +1150,7 @@ which receives as argument den issue-alist."
 (ytr-define-action "org-link-heading" 'ytr-org-link-heading-action)
 (ytr-define-action "org-capture" 'ytr-capture-action)
 (ytr-define-action "send-attachments" 'ytr-send-attachments-action)
+(ytr-define-action "quick-comment" 'ytr-quick-comment-action)
 
 ;;;; Issue buttons
 
