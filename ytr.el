@@ -737,8 +737,8 @@ nil."
       (keep-content
        (org-set-property "YTR_CONTENT_HASH"
                          (let ((content (cl-case node-type
-                                          (description (alist-get '.description (ytr-retrieve-issue-alist issue-code)))
-                                          (comment (alist-get '.text (ytr-retrieve-issue-comment-alist issue-code node-code))))))
+                                          (description (alist-get 'description (ytr-retrieve-issue-alist issue-code)))
+                                          (comment (alist-get 'text (ytr-retrieve-issue-comment-alist issue-code node-code))))))
                            (if content (sha1 content) ""))))
       (kill (org-cut-subtree))
       (fetch
