@@ -942,32 +942,37 @@ nil."
         (message "Canceled by user.")))))
 
 ;;;; preview
+(defface ytr-preview-field-name-face '((t . (:inherit font-lock-variable-name-face))) "Font used for field values in ytr preview window")
+(defface ytr-preview-field-value-face '((t . (:inherit font-lock-warning-face :weight bold))) "Font used for field values in ytr preview window")
+(defface ytr-preview-issue-code-face '((t . (:inherit org-todo :inverse-video t :weight bold))) "Font used for field values in ytr preview window")
+(defface ytr-preview-summary-face '((t . (:inherit org-todo :weight bold))) "Font used for field values in ytr preview window")
+
 (defconst ytr-sneak-field-created
-  '("created: %s" . (lambda (issue-alist) (let-alist issue-alist (if .created (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)) "-"))))
+  '("created: " . (lambda (issue-alist) (let-alist issue-alist (if .created (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)) "-"))))
   "Field Definition for Sneak Preview to show the created")
 (defconst ytr-sneak-field-updated
-  '("updated: %s" . (lambda (issue-alist) (let-alist issue-alist (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-"))))
+  '("updated: " . (lambda (issue-alist) (let-alist issue-alist (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-"))))
   "Field Definition for Sneak Preview to show the updated")
 (defconst ytr-sneak-field-resolved
-  '("resolved: %s" . (lambda (issue-alist) (let-alist issue-alist (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-"))))
+  '("resolved: " . (lambda (issue-alist) (let-alist issue-alist (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-"))))
   "Field Definition for Sneak Preview to show the Resolved")
 (defconst ytr-sneak-field-reporter
-  '("Reporter: %s" . (lambda (issue-alist) (alist-get 'fullName (alist-get 'reporter issue-alist))))
+  '("Reporter: " . (lambda (issue-alist) (alist-get 'fullName (alist-get 'reporter issue-alist))))
   "Field Definition for Sneak Preview to show the Reporter")
 (defconst ytr-sneak-field-type
-  '("Type: %s" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Type")))
+  '("Type: " . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Type")))
   "Field Definition for Sneak Preview to show the Priority")
 (defconst ytr-sneak-field-priority
-  '("Priority: %s" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Priority")))
+  '("Priority: " . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Priority")))
   "Field Definition for Sneak Preview to show the Priority")
 (defconst ytr-sneak-field-state
-  '("State: %s" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "State")))
+  '("State: " . (lambda (issue-alist) (ytr-get-customField-value issue-alist "State")))
   "Field Definition for Sneak Preview to show the State")
 (defconst ytr-sneak-field-assignee
-  '("Assignee: %s" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Assignee")))
+  '("Assignee: " . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Assignee")))
   "Field Definition for Sneak Preview to show the Assignee")
 (defconst ytr-sneak-field-comments
-  '("Comments: %s" . (lambda (issue-alist) (length (alist-get 'comments issue-alist))))
+  '("Comments: " . (lambda (issue-alist) (length (alist-get 'comments issue-alist))))
   "Field Definition for Sneak Preview to show the Comments")
 
 (defcustom ytr-sneak-fields-issue
@@ -980,20 +985,27 @@ which receives as argument den issue-alist."
 
 (defun ytr-sneak-window-issue (issue-alist)
   "Display a side window with the description and same basic information on issue."
-  (with-output-to-temp-buffer "*ytr-describe-issue*"
-    (let-alist issue-alist
-      (princ (format "%s: %s\n" .idReadable .summary))
-      (princ (string-join (mapcar (lambda (field)
-                                    (format (car field) (funcall (cdr field) issue-alist)))
-                                  ytr-sneak-fields-issue) ", "))
-      (unless (= (length .attachments) 0)
-        (princ "\nAttachments:")
-        (mapc (lambda (attachment-alist)
-                (let-alist attachment-alist
-                  (princ (format " [\"%s\" %s %s]" .name .mimeType (file-size-human-readable .size)))))
-              .attachments))
-      (princ "\n------------------------\n")
-      (princ .description))))
+  (let ((buf (get-buffer-create "*ytr-describe-issue*")))
+    (with-current-buffer buf
+      (erase-buffer)
+      (let-alist issue-alist
+        (insert (format "%s %s\n"
+                        (propertize (format " %s ".idReadable) 'face 'ytr-preview-issue-code-face)
+                        (propertize .summary 'face 'ytr-preview-summary-face)))
+        (insert (string-join (mapcar (lambda (field)
+                                       (concat (propertize (car field) 'face 'ytr-preview-field-name-face)
+                                               (propertize (format "%s" (funcall (cdr field) issue-alist)) 'face 'ytr-preview-field-value-face)))
+                                     ytr-sneak-fields-issue) "  "))
+        (unless (= (length .attachments) 0)
+          (insert "\nAttachments:")
+          (mapc (lambda (attachment-alist)
+                  (let-alist attachment-alist
+                    (insert (format " [\"%s\" %s %s]" .name .mimeType (file-size-human-readable .size)))))
+                .attachments))
+        (insert (propertize "\n------------------------\n" 'face 'shadow))
+        (insert .description)
+        (goto-char (point-min))))
+    (display-buffer buf)))
 
 (defun ytr-sneak-window-comment (issue-alist node-code)
   "Display a side window with the description and basic information on the comment."
