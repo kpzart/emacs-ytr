@@ -173,7 +173,7 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 
 (defun ytr-surrounded-pattern (pattern)
   "Add surroundings to pattern"
-  (format "\\([^a-zA-Z0-9-#]\\)\\(%s\\)\\([^a-zA-Z0-9-#]\\)" pattern))
+  (format "\\b\\(%s\\)\\b" pattern))
 
 (defun ytr-read-issue-code-annotated ()
   "Return an issue-code from a query"
@@ -280,15 +280,24 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
     (if (string-match (format "^\\([a-zA-Z]+/\\)?\\(%s\\)[-_].*$" ytr-issue-code-pattern) branch-name)
         (match-string 2 branch-name))))
 
+(defun ytr-issue-code-from-line ()
+  "Return the first issue code in current line"
+  (let* ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+    (if (string-match (ytr-surrounded-pattern ytr-issue-node-code-pattern) line)
+        (match-string 0 line)
+      nil)))
+
 (defun ytr-guess-issue-code ()
   "Return a issue code from current context."
   (interactive)
   (let ((issue-code (ytr-issue-code-from-point)))
     (if issue-code issue-code
-      (let ((issue-node-cons (ytr-issue-node-cons-from-org-property)))
-        (if issue-node-cons (car issue-node-cons)
-          (let ((issue-code (ytr-issue-code-from-branch)))
-            (if issue-code issue-code nil)))))))
+      (let ((issue-code (ytr-issue-code-from-line)))
+        (if issue-code issue-code
+          (let ((issue-node-cons (ytr-issue-node-cons-from-org-property)))
+            (if issue-node-cons (car issue-node-cons)
+              (let ((issue-code (ytr-issue-code-from-branch)))
+                (if issue-code issue-code nil)))))))))
 
 (defun ytr-guess-issue-node-cons ()
   "Return a cons cell from issue code and node code from current context."
