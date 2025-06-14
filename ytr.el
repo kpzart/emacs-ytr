@@ -950,6 +950,59 @@ nil."
               (message "Attachments deleted.")))
         (message "Canceled by user.")))))
 
+;;;;; query to org table
+(defun ytr-data-to-org-table (data)
+  "Convert DATA (a list of lists) to an org mode table string."
+  (let* ((header (car data))
+         (rows (cdr data))
+         ;; Helper function to format a single row
+         (format-row (lambda (row)
+                       (concat "| " (mapconcat 'identity row " | ") " |")))
+         ;; Create header row
+         (header-row (funcall format-row header))
+         ;; Create separator row (e.g., |---|---|---|)
+         (separator-row
+          (concat "|"
+                  (mapconcat (lambda (_) "---") header "|")
+                  "|"))
+         ;; Create data rows
+         (data-rows (mapconcat format-row rows "\n")))
+    ;; Combine all parts
+    (concat header-row "\n" separator-row "\n" data-rows "\n")))
+
+(defun ytr-insert-and-align-org-table (data)
+  "Insert DATA as an org mode table and align it."
+  (interactive)
+  (let ((table (ytr-data-to-org-table data)))
+    (insert table)
+    ;; Move cursor to the beginning of the inserted table
+    (forward-line (- 1 (length (split-string table "\n"))))
+    ;; Align the table
+    (org-table-align)))
+
+(defun ytr-query-to-org-table (query)
+  "Execute QUERY and insert it as an org mode table."
+  (interactive (list (ytr-read-query-consult)))
+  (let* ((issues-alist (ytr-retrieve-query-issues-alist query))
+         (table-data (cons
+                      '("*ID*" "*Summary*" "*Priority*" "*Type*" "*State*" "*Reporter*" "*Assignee*" "*Comments*" "*Created*" "*Updated*" "*Resolved*")
+                      (mapcar (lambda (issue-alist)
+                                (let-alist issue-alist
+                                  (list .idReadable
+                                        .summary
+                                        (ytr-get-customField-value issue-alist "Priority")
+                                        (ytr-get-customField-value issue-alist "Type")
+                                        (ytr-get-customField-value issue-alist "State")
+                                        (ytr-get-customField-value issue-alist "Reporter")
+                                        (ytr-get-customField-value issue-alist "Assignee")
+                                        (format "%i" (length (alist-get 'comments issue-alist)))
+                                        (if .created (format-time-string "%Y-%m-%d" (/ .created 1000)) "-")
+                                        (if .updated (format-time-string "%Y-%m-%d" (/ .updated 1000)) "-")
+                                        (if .resolved (format-time-string "%Y-%m-%d" (/ .updated 1000)) "-")
+                                        )))
+                              issues-alist))))
+    (ytr-insert-and-align-org-table table-data)))
+
 ;;;; preview
 (defface ytr-preview-field-name-face '((t . (:inherit font-lock-variable-name-face))) "Font used for field values in ytr preview window")
 (defface ytr-preview-field-value-face '((t . (:inherit font-lock-warning-face :weight bold))) "Font used for field values in ytr preview window")
