@@ -984,23 +984,18 @@ nil."
   "Execute QUERY and insert it as an org mode table."
   (interactive (list (ytr-read-query-consult)))
   (let* ((issues-alist (ytr-retrieve-query-issues-alist query))
+         (issue-properties (cons ytr-issue-property-id (cons ytr-issue-property-summary ytr-issue-properties)))
          (table-data (cons
-                      '("*ID*" "*Summary*" "*Priority*" "*Type*" "*State*" "*Reporter*" "*Assignee*" "*Comments*" "*Created*" "*Updated*" "*Resolved*")
+                      (mapcar (lambda (issue-property)
+                                (format "*%s*" (car issue-property)))
+                              issue-properties)
                       (mapcar (lambda (issue-alist)
                                 (let-alist issue-alist
-                                  (list .idReadable
-                                        .summary
-                                        (ytr-get-customField-value issue-alist "Priority")
-                                        (ytr-get-customField-value issue-alist "Type")
-                                        (ytr-get-customField-value issue-alist "State")
-                                        (ytr-get-customField-value issue-alist "Reporter")
-                                        (ytr-get-customField-value issue-alist "Assignee")
-                                        (format "%i" (length (alist-get 'comments issue-alist)))
-                                        (if .created (format-time-string "%Y-%m-%d" (/ .created 1000)) "-")
-                                        (if .updated (format-time-string "%Y-%m-%d" (/ .updated 1000)) "-")
-                                        (if .resolved (format-time-string "%Y-%m-%d" (/ .updated 1000)) "-")
-                                        )))
+                                  (mapcar (lambda (issue-property)
+                                            (funcall (cdr issue-property) issue-alist))
+                                          issue-properties)))
                               issues-alist))))
+    (insert (concat "#+ytr_query: " query "\n"))
     (ytr-insert-and-align-org-table table-data)))
 
 ;;;; preview
@@ -1009,36 +1004,42 @@ nil."
 (defface ytr-preview-issue-code-face '((t . (:inherit org-todo :inverse-video t :weight bold))) "Font used for field values in ytr preview window")
 (defface ytr-preview-summary-face '((t . (:inherit org-todo :weight bold))) "Font used for field values in ytr preview window")
 
-(defconst ytr-sneak-field-created
-  '("created: " . (lambda (issue-alist) (let-alist issue-alist (if .created (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)) "-"))))
+(defconst ytr-issue-property-id
+  '("ID" . (lambda (issue-alist) (alist-get 'idReadable issue-alist)))
+  "Field Definition for Sneak Preview to show the ID")
+(defconst ytr-issue-property-summary
+  '("Summary" . (lambda (issue-alist) (alist-get 'summary issue-alist)))
+  "Field Definition for Sneak Preview to show the summary")
+(defconst ytr-issue-property-created
+  '("created" . (lambda (issue-alist) (let-alist issue-alist (if .created (format-time-string "%Y-%m-%d %H:%M" (/ .created 1000)) "-"))))
   "Field Definition for Sneak Preview to show the created")
-(defconst ytr-sneak-field-updated
-  '("updated: " . (lambda (issue-alist) (let-alist issue-alist (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-"))))
+(defconst ytr-issue-property-updated
+  '("updated" . (lambda (issue-alist) (let-alist issue-alist (if .updated (format-time-string "%Y-%m-%d %H:%M" (/ .updated 1000)) "-"))))
   "Field Definition for Sneak Preview to show the updated")
-(defconst ytr-sneak-field-resolved
-  '("resolved: " . (lambda (issue-alist) (let-alist issue-alist (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-"))))
+(defconst ytr-issue-property-resolved
+  '("resolved" . (lambda (issue-alist) (let-alist issue-alist (if .resolved (format-time-string "%Y-%m-%d %H:%M" (/ .resolved 1000)) "-"))))
   "Field Definition for Sneak Preview to show the Resolved")
-(defconst ytr-sneak-field-reporter
-  '("Reporter: " . (lambda (issue-alist) (alist-get 'fullName (alist-get 'reporter issue-alist))))
+(defconst ytr-issue-property-reporter
+  '("Reporter" . (lambda (issue-alist) (alist-get 'fullName (alist-get 'reporter issue-alist))))
   "Field Definition for Sneak Preview to show the Reporter")
-(defconst ytr-sneak-field-type
-  '("Type: " . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Type")))
+(defconst ytr-issue-property-type
+  '("Type" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Type")))
   "Field Definition for Sneak Preview to show the Priority")
-(defconst ytr-sneak-field-priority
-  '("Priority: " . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Priority")))
+(defconst ytr-issue-property-priority
+  '("Priority" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Priority")))
   "Field Definition for Sneak Preview to show the Priority")
-(defconst ytr-sneak-field-state
-  '("State: " . (lambda (issue-alist) (ytr-get-customField-value issue-alist "State")))
+(defconst ytr-issue-property-state
+  '("State" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "State")))
   "Field Definition for Sneak Preview to show the State")
-(defconst ytr-sneak-field-assignee
-  '("Assignee: " . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Assignee")))
+(defconst ytr-issue-property-assignee
+  '("Assignee" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Assignee")))
   "Field Definition for Sneak Preview to show the Assignee")
-(defconst ytr-sneak-field-comments
-  '("Comments: " . (lambda (issue-alist) (length (alist-get 'comments issue-alist))))
+(defconst ytr-issue-property-comments
+  '("Comments" . (lambda (issue-alist) (format "%i" (length (alist-get 'comments issue-alist)))))
   "Field Definition for Sneak Preview to show the Comments")
 
-(defcustom ytr-sneak-fields-issue
-  (list ytr-sneak-field-created ytr-sneak-field-updated ytr-sneak-field-resolved ytr-sneak-field-reporter ytr-sneak-field-priority ytr-sneak-field-type ytr-sneak-field-state ytr-sneak-field-assignee ytr-sneak-field-comments)
+(defcustom ytr-issue-properties
+  (list ytr-issue-property-created ytr-issue-property-updated ytr-issue-property-resolved ytr-issue-property-reporter ytr-issue-property-priority ytr-issue-property-type ytr-issue-property-state ytr-issue-property-assignee ytr-issue-property-comments)
   "List of fields to print in sneak window for issues.
 
 Each entry is a cons of a format definition and a function to compute the value,
@@ -1055,9 +1056,9 @@ which receives as argument den issue-alist."
                         (propertize (format " %s ".idReadable) 'face 'ytr-preview-issue-code-face)
                         (propertize .summary 'face 'ytr-preview-summary-face)))
         (insert (string-join (mapcar (lambda (field)
-                                       (concat (propertize (car field) 'face 'ytr-preview-field-name-face)
+                                       (concat (propertize (format "%s: " (car field)) 'face 'ytr-preview-field-name-face)
                                                (propertize (format "%s" (funcall (cdr field) issue-alist)) 'face 'ytr-preview-field-value-face)))
-                                     ytr-sneak-fields-issue) "  "))
+                                     ytr-issue-properties) "  "))
         (unless (= (length .attachments) 0)
           (insert "\nAttachments:")
           (mapc (lambda (attachment-alist)
