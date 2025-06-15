@@ -468,6 +468,17 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
     (if value-name value-name "-")))
 
 ;;;; org mode conversion
+(defun ytr-align-all-org-tables-in-buffer ()
+  "Align all org tables in the current buffer, calling `org-table-align` once per table.
+Preserves point."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward org-table-dataline-regexp nil t)
+      (org-table-align)
+      ;; Move point to the end of the current table to avoid realigning the same table
+      (goto-char (org-table-end)))))
+
 (defun ytr-md-to-org (input level &optional patch-file)
   "Convert a markdown string to org mode using pandoc.
 
@@ -495,6 +506,7 @@ conversion loss."
       (org-mode)
       (ytr-demote-org-headings (or level 3))
       (org-unindent-buffer)
+      (ytr-align-all-org-tables-in-buffer)
       ;; now create the patch
       (when patch-file
         (with-current-buffer input-md-buffer
