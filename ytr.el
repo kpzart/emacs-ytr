@@ -129,6 +129,18 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
                               (_
                                (all-completions str choices pred))))))
 
+(defun ytr-get-issue-activity (issue-alist)
+  "Return the most recent timestamp of an issue with an info string as cons (info . ts)"
+  (let-alist issue-alist
+    (if .resolved (cons "resolved" .resolved)
+      (if (and .updated (> (- .updated 10000) .created)) (cons "updated" .updated)
+        (cons "created" .created)))))
+
+(defun ytr-activity-string (activity)
+  (let ((info (car activity))
+        (timestamp (cdr activity)))
+    (format "%s %s" info (format-time-string "%Y-%m-%d %H:%M" (/ timestamp 1000)))))
+
 (defun ytr-annotate-issue-code (cand)
   "Annotate issue-code with some info"
   (let* ((issue-code (car (split-string cand ":")))
@@ -143,8 +155,9 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
        ((ytr-get-customField-value issue-alist "State") :format "St: %s" :truncate .2 :face 'marginalia-documentation)
        ((ytr-get-customField-value issue-alist "Assignee") :format "As: %s" :truncate .2 :face 'marginalia-documentation)
        ((length (alist-get 'comments issue-alist)) :format "Re: %s" :truncate 7 :face 'marginalia-documentation)
-       ((if .created (format-time-string "%Y-%m-%d" (/ .created 1000)) "-") :format "ct: %s" :truncate 20 :face 'marginalia-documentation)
-       ((if .updated (format-time-string "%Y-%m-%d" (/ .updated 1000)) "-") :format "ut: %s" :truncate 20 :face 'marginalia-documentation)
+       ((ytr-activity-string (ytr-get-issue-activity issue-alist)) :format "%s" :truncate 26 :face 'marginalia-documentation)
+       ;; ((if .created (format-time-string "%Y-%m-%d" (/ .created 1000)) "-") :format "ct: %s" :truncate 20 :face 'marginalia-documentation)
+       ;; ((if .updated (format-time-string "%Y-%m-%d" (/ .updated 1000)) "-") :format "ut: %s" :truncate 20 :face 'marginalia-documentation)
        ))))
 
 (defun ytr-annotate-query (cand)
@@ -1049,9 +1062,13 @@ nil."
 (defconst ytr-issue-property-comments
   '("Comments" . (lambda (issue-alist) (format "%i" (length (alist-get 'comments issue-alist)))))
   "Field Definition for Sneak Preview to show the Comments")
+(defconst ytr-issue-property-activity
+  '("Activity" . (lambda (issue-alist)
+                   (ytr-activity-string (ytr-get-issue-activity issue-alist))))
+  "Field Definition for Sneak Preview to show the recent activity")
 
 (defcustom ytr-issue-properties
-  (list ytr-issue-property-created ytr-issue-property-updated ytr-issue-property-resolved ytr-issue-property-reporter ytr-issue-property-priority ytr-issue-property-type ytr-issue-property-state ytr-issue-property-assignee ytr-issue-property-comments)
+  (list ytr-issue-property-priority ytr-issue-property-type ytr-issue-property-state ytr-issue-property-reporter ytr-issue-property-assignee ytr-issue-property-comments ytr-issue-property-activity)
   "List of fields to print in sneak window for issues.
 
 Each entry is a cons of a format definition and a function to compute the value,
