@@ -1005,7 +1005,7 @@ nil."
     ;; Align the table
     (org-table-align)))
 
-(defun ytr-query-to-org-table (query)
+(defun ytr-query-to-org-table (query &optional no-query-keyword)
   "Execute QUERY and insert it as an org mode table."
   (interactive (list (ytr-read-query-consult)))
   (let* ((issues-alist (ytr-retrieve-query-issues-alist query))
@@ -1020,8 +1020,42 @@ nil."
                                             (funcall (cdr issue-property) issue-alist))
                                           issue-properties)))
                               issues-alist))))
-    (insert (concat "#+ytr_query: " query "\n"))
+    (when (not no-query-keyword)
+      (insert (concat "#+ytr_query: " query "\n")))
     (ytr-insert-and-align-org-table table-data)))
+
+(defun ytr-update-org-query-table ()
+  "Update the query table under point according to ytr-query keyword."
+  (interactive)
+  (let ((my-point (point))
+        (key-values))
+    ;; Gehe zur ersten keyword Zeile
+    (when (org-table-p)
+      (goto-char (org-table-begin))
+      (forward-line -1))
+    (when (not (org-at-keyword-p))
+      (goto-char my-point)
+      (user-error "No table keywords found."))
+    (while (and (not (= (point) (point-min))) (org-at-keyword-p))
+      (forward-line -1))
+    (when (not (org-at-keyword-p))
+      (forward-line))
+    ;; Parse die keywords
+    (while (org-at-keyword-p)
+      (when (not (org-match-line org-keyword-regexp))
+        (user-error "Did not understand keyword line"))
+      (push (cons (match-string-no-properties 1) (match-string-no-properties 2)) key-values)
+      (forward-line)
+      )
+    ;; Suche nach einer Query Definition
+    (let ((query (alist-get "ytr-query" key-values nil nil #'string=))
+          (columns (alist-get "ytr-columns" key-values nil nil #'string=)))
+      (when (not query)
+        (user-error "No ytr-query found"))
+      ;; Lösche die Tabelle
+      (delete-region (org-table-begin) (org-table-end))
+      ;; Neue Tabelle
+      (ytr-query-to-org-table query t))))
 
 ;;;; preview
 (defface ytr-preview-field-name-face '((t . (:inherit font-lock-variable-name-face))) "Font used for field values in ytr preview window")
