@@ -1005,11 +1005,11 @@ nil."
     ;; Align the table
     (org-table-align)))
 
-(defun ytr-query-to-org-table (query &optional no-query-keyword)
+(defun ytr-query-to-org-table (query &optional no-query-keyword issue-properties)
   "Execute QUERY and insert it as an org mode table."
   (interactive (list (ytr-read-query-consult)))
   (let* ((issues-alist (ytr-retrieve-query-issues-alist query))
-         (issue-properties (cons ytr-issue-property-id (cons ytr-issue-property-summary ytr-issue-properties)))
+         (issue-properties (cons ytr-issue-property-id (cons ytr-issue-property-summary (or issue-properties ytr-issue-properties))))
          (table-data (cons
                       (mapcar (lambda (issue-property)
                                 (format "*%s*" (car issue-property)))
@@ -1043,6 +1043,7 @@ nil."
     ;; Parse die keywords
     (while (org-at-keyword-p)
       (when (not (org-match-line org-keyword-regexp))
+        (goto-char my-point)
         (user-error "Did not understand keyword line"))
       (push (cons (match-string-no-properties 1) (match-string-no-properties 2)) key-values)
       (forward-line)
@@ -1051,11 +1052,32 @@ nil."
     (let ((query (alist-get "ytr-query" key-values nil nil #'string=))
           (columns (alist-get "ytr-columns" key-values nil nil #'string=)))
       (when (not query)
+        (goto-char my-point)
         (user-error "No ytr-query found"))
-      ;; Lösche die Tabelle
-      (delete-region (org-table-begin) (org-table-end))
-      ;; Neue Tabelle
-      (ytr-query-to-org-table query t))))
+      ;; Baue die properties
+      (let ((properties (if columns
+                            (mapcar (lambda (property-name)
+                                      (if (boundp (intern property-name))
+                                          (symbol-value (intern property-name))
+                                        (goto-char my-point)
+                                        (user-error "Did not found property symbol"))
+                                      )
+                                    (split-string columns "\\s-+"))
+                          ytr-issue-properties
+                          )))
+        ;; Lösche die Tabelle
+        (delete-region (org-table-begin) (org-table-end))
+        ;; Neue Tabelle
+        (ytr-query-to-org-table query t properties)
+        )
+      )))
+
+(defun ytr-update-org-query-table-hook ()
+  (condition-case nil
+      (progn (ytr-update-org-query-table) t)
+    (user-error nil)))
+
+(add-to-list 'org-ctrl-c-ctrl-c-hook #'ytr-update-org-query-table-hook)
 
 ;;;; preview
 (defface ytr-preview-field-name-face '((t . (:inherit font-lock-variable-name-face))) "Font used for field values in ytr preview window")
