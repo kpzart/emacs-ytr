@@ -477,8 +477,16 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 (defun ytr-get-customField-value (issue-alist field-name)
   (let* ((field-alist (cl-find-if (lambda (alist) (equal (cdr (assoc 'name alist)) field-name)) (alist-get 'customFields issue-alist)))
          (value-alist (assoc 'value field-alist))
-         (value-name (cdr (assoc 'name value-alist))))
+         (value-name (cdr (assoc 'name (cdr value-alist)))))
     (if value-name value-name "-")))
+
+(defun ytr-get-customField-list-value (issue-alist field-name)
+  (let* ((field-alist (cl-find-if (lambda (alist) (equal (cdr (assoc 'name alist)) field-name)) (alist-get 'customFields issue-alist)))
+         (values-alist (assoc 'value field-alist))
+         (value-name (mapconcat (lambda (value-alist)
+                                  (cdr (assoc 'name value-alist)))
+                                (cdr values-alist) ", ")))
+    (if (< 0 (length value-name)) value-name "-")))
 
 ;;;; org mode conversion
 (defun ytr-align-all-org-tables-in-buffer ()
@@ -1134,9 +1142,15 @@ nil."
   '("Activity" . (lambda (issue-alist)
                    (ytr-activity-string (ytr-get-issue-activity issue-alist))))
   "Field Definition for Sneak Preview to show the recent activity")
+(defconst ytr-issue-property-subsystem
+  '("Subsystem" . (lambda (issue-alist) (ytr-get-customField-value issue-alist "Subsystem")))
+  "Field Definition for Sneak Preview to show the Subsystem")
+(defconst ytr-issue-property-fixversions
+  '("Fix versions" . (lambda (issue-alist) (ytr-get-customField-list-value issue-alist "Fix versionss")))
+  "Field Definition for Sneak Preview to show the Subsystem")
 
 (defcustom ytr-issue-properties
-  (list ytr-issue-property-priority ytr-issue-property-type ytr-issue-property-state ytr-issue-property-reporter ytr-issue-property-assignee ytr-issue-property-comments ytr-issue-property-activity)
+  (list ytr-issue-property-fixversions ytr-issue-property-subsystem ytr-issue-property-priority ytr-issue-property-type ytr-issue-property-state ytr-issue-property-reporter ytr-issue-property-assignee ytr-issue-property-comments ytr-issue-property-activity)
   "List of fields to print in sneak window for issues.
 
 Each entry is a cons of a format definition and a function to compute the value,
