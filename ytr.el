@@ -990,7 +990,7 @@ nil."
             (org-back-to-heading)
             (switch-to-buffer (current-buffer)))
         (goto-char initial-point)
-        (message "Regexp not found.")))))
+        (message "Issue Code not found.")))))
 
 ;;;;; query to org table
 (defun ytr-data-to-org-table (data)
