@@ -1063,8 +1063,7 @@ nil."
         (goto-char my-point)
         (user-error "Did not understand keyword line"))
       (push (cons (match-string-no-properties 1) (match-string-no-properties 2)) key-values)
-      (forward-line)
-      )
+      (forward-line))
     ;; Suche nach einer Query Definition
     (let ((query (alist-get "ytr-query" key-values nil nil #'string=))
           (columns (alist-get "ytr-columns" key-values nil nil #'string=)))
@@ -1077,17 +1076,13 @@ nil."
                                       (if (boundp (intern property-name))
                                           (symbol-value (intern property-name))
                                         (goto-char my-point)
-                                        (user-error "Did not find property symbol %s" property-name))
-                                      )
+                                        (user-error "Did not find property symbol %s" property-name)))
                                     (split-string columns "\\s-+"))
-                          ytr-issue-properties
-                          )))
+                          ytr-issue-properties)))
         ;; Lösche die Tabelle
         (delete-region (org-table-begin) (org-table-end))
         ;; Neue Tabelle
-        (ytr-query-to-org-table query t properties)
-        )
-      )))
+        (ytr-query-to-org-table query t properties)))))
 
 (defun ytr-update-org-query-table-hook ()
   (condition-case nil
