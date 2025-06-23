@@ -975,6 +975,23 @@ nil."
               (message "Attachments deleted.")))
         (message "Canceled by user.")))))
 
+(defcustom ytr-org-file "~/ytr.org" "File path used for persisting downloaded issues." :type 'file)
+
+(defun ytr-find-org-node-action (issue-node-cons)
+  "Find the first node with given ids in ytr org file"
+  (with-current-buffer (find-file-noselect ytr-org-file)
+    ;; do something with the buffer
+    (let ((initial-point (point))
+          (regexp (format "^[   ]*:YTR_ISSUE_CODE:[   ]*%s$" (ytr-issue-node-code-action issue-node-cons))))
+      (goto-char (point-min))
+      (if (re-search-forward regexp nil t)
+          (progn
+            (goto-char (match-beginning 0))
+            (org-back-to-heading)
+            (switch-to-buffer (current-buffer)))
+        (goto-char initial-point)
+        (message "Regexp not found.")))))
+
 ;;;;; query to org table
 (defun ytr-data-to-org-table (data)
   "Convert DATA (a list of lists) to an org mode table string."
@@ -1311,6 +1328,7 @@ which receives as argument den issue-alist."
 (ytr-define-action "org-capture" 'ytr-capture-action)
 (ytr-define-action "send-attachments" 'ytr-send-attachments-action)
 (ytr-define-action "quick-comment" 'ytr-quick-comment-action)
+(ytr-define-action "find-node" 'ytr-find-org-node-action)
 
 ;;;; Issue buttons
 
