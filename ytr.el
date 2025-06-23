@@ -1077,7 +1077,7 @@ nil."
                                       (if (boundp (intern property-name))
                                           (symbol-value (intern property-name))
                                         (goto-char my-point)
-                                        (user-error "Did not found property symbol"))
+                                        (user-error "Did not find property symbol %s" property-name))
                                       )
                                     (split-string columns "\\s-+"))
                           ytr-issue-properties
