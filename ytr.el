@@ -506,6 +506,8 @@ Preserves point."
       ;; Move point to the end of the current table to avoid realigning the same table
       (goto-char (org-table-end)))))
 
+(defcustom ytr-save-import-patch-inline nil "Control wether an inline code block is written to each imported node." :type 'boolean :group 'ytr)
+
 (defun ytr-md-to-org (input level &optional patch-file)
   "Convert a markdown string to org mode using pandoc.
 
@@ -535,19 +537,28 @@ conversion loss."
       (org-unindent-buffer)
       (ytr-align-all-org-tables-in-buffer)
       ;; now create the patch
-      (when patch-file
-        (with-current-buffer input-md-buffer
-          (erase-buffer)
-          (insert input))
-        (save-current-buffer
-          (org-export-to-buffer 'gfm org-export-gfm-buffer)
-          (ytr-perform-markdown-replacements "")
-          (unwind-protect
-              (progn
-                (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer )
-                (with-current-buffer diff-md-buffer
-                  (write-region (point-min) (point-max) patch-file))))))
-      (buffer-string))))
+      (with-current-buffer input-md-buffer
+        (erase-buffer)
+        (insert input))
+      (let ((org-export-show-temporary-export-buffer nil))
+        (org-export-to-buffer 'gfm org-export-gfm-buffer))
+      (with-current-buffer org-export-gfm-buffer (ytr-perform-markdown-replacements "") )
+      (unwind-protect
+          (progn
+            (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer )
+            (when patch-file
+              (with-current-buffer diff-md-buffer
+                (write-region (point-min) (point-max) patch-file)))
+            (when ytr-save-import-patch-inline
+              (save-excursion
+                (goto-char (point-min))
+                (insert "#+name: ytr_md_conversion_loss\n")
+                (insert "#+begin_src diff\n")
+                (insert (with-current-buffer diff-md-buffer (buffer-string)))
+                (insert "#+end_src\n")
+                (insert "\n")
+                )))))
+    (buffer-string)))
 
 (defun ytr-insert-issue-alist-as-org (issue-alist level)
   "Insert the issue given by ISSUE-ALIST as org at point"
