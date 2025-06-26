@@ -301,7 +301,8 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
       nil)))
 
 (defun ytr-issue-node-cons-from-line ()
-  (ytr-parse-issue-node-code (ytr-issue-node-code-from-line)))
+  (let ((code (ytr-issue-node-code-from-line)))
+    (when code (ytr-parse-issue-node-code code))))
 
 (defun ytr-guess-issue-code ()
   "Return a issue code from current context."
@@ -1182,7 +1183,7 @@ which receives as argument den issue-alist."
                     (insert (format " [\"%s\" %s %s]" .name .mimeType (file-size-human-readable .size)))))
                 .attachments))
         (insert (propertize "\n------------------------\n" 'face 'shadow))
-        (insert .description)
+        (if .description (insert .description))
         (goto-char (point-min))))
     (display-buffer buf)))
 
@@ -1342,7 +1343,7 @@ which receives as argument den issue-alist."
 (ytr-define-action "org-capture" 'ytr-capture-action)
 (ytr-define-action "send-attachments" 'ytr-send-attachments-action)
 (ytr-define-action "quick-comment" 'ytr-quick-comment-action)
-(ytr-define-action "find-node" 'ytr-find-org-node-action)
+(ytr-define-action "find-org-node" 'ytr-find-org-node-action)
 
 ;;;; Issue buttons
 
