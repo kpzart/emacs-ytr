@@ -506,13 +506,13 @@ Preserves point."
       ;; Move point to the end of the current table to avoid realigning the same table
       (goto-char (org-table-end)))))
 
-(defcustom ytr-save-import-patch-inline nil "Control wether an inline code block is written to each imported node." :type 'boolean :group 'ytr)
+(defcustom ytr-save-import-diff-inline nil "Control wether an inline code block is written to each imported node." :type 'boolean :group 'ytr)
 
-(defun ytr-md-to-org (input level &optional patch-file)
+(defun ytr-md-to-org (input level &optional diff-file)
   "Convert a markdown string to org mode using pandoc.
 
 LEVEL indicates the level of top level headings in org and defaults to 3.
-If PATCH-FILE is given, a diff file is written, that contains possible
+If DIFF-FILE is given, a diff file is written, that contains possible
 conversion loss."
   (save-current-buffer
     (let ((input-md-buffer (get-buffer-create "*ytr-input-md*"))
@@ -536,7 +536,7 @@ conversion loss."
       (ytr-demote-org-headings (or level 3))
       (org-unindent-buffer)
       (ytr-align-all-org-tables-in-buffer)
-      ;; now create the patch
+      ;; now create the diff
       (with-current-buffer input-md-buffer
         (erase-buffer)
         (insert input))
@@ -545,14 +545,15 @@ conversion loss."
       (with-current-buffer org-export-gfm-buffer (ytr-perform-markdown-replacements "") )
       (unwind-protect
           (progn
-            (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer )
-            (when patch-file
+            (let ((diff-switches))
+              (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer ))
+            (when diff-file
               (with-current-buffer diff-md-buffer
-                (write-region (point-min) (point-max) patch-file)))
-            (when ytr-save-import-patch-inline
+                (write-region (point-min) (point-max) diff-file)))
+            (when ytr-save-import-diff-inline
               (save-excursion
                 (goto-char (point-min))
-                (insert "#+name: ytr_md_conversion_loss\n")
+                (insert "#+name: ytr_import_diff\n")
                 (insert "#+begin_src diff\n")
                 (insert (with-current-buffer diff-md-buffer (buffer-string)))
                 (insert "#+end_src\n")
