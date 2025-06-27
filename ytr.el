@@ -508,6 +508,8 @@ Preserves point."
 
 (defcustom ytr-save-import-diff-inline nil "Control wether an inline code block is written to each imported node." :type 'boolean :group 'ytr)
 
+(defcustom ytr-import-diff-switches "--ignore-space-change" "Diff Switches used to create the import diff." :type 'string :group 'ytr)
+
 (defun ytr-md-to-org (input level &optional diff-file)
   "Convert a markdown string to org mode using pandoc.
 
@@ -545,11 +547,20 @@ conversion loss."
       (with-current-buffer org-export-gfm-buffer (ytr-perform-markdown-replacements "") )
       (unwind-protect
           (progn
-            (let ((diff-switches))
+            (let ((diff-switches ytr-import-diff-switches))
               (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer ))
+            (with-current-buffer diff-md-buffer
+              (goto-char (point-min))
+              (delete-line)
+              (goto-char (- (point-max) 1))
+              (delete-line)
+              (goto-char (- (point-max) 1))
+              (delete-line)
+              )
             (when diff-file
               (with-current-buffer diff-md-buffer
-                (write-region (point-min) (point-max) diff-file)))
+                (write-region (point-min) (point-max) diff-file)
+                ))
             (when ytr-save-import-diff-inline
               (save-excursion
                 (goto-char (point-min))
