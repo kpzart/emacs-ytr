@@ -880,6 +880,28 @@ nil."
                 ytr-buffer-node-type 'comment
                 ytr-buffer-commit-type 'create)))
 
+(defun ytr-quick-node-edit-action (issue-node-cons)
+  "Open a markdown buffer to write a quick comment."
+  (let ((issue-code (car issue-node-cons))
+        (node-code (cdr issue-node-cons))
+        (position (point))
+        (text "")
+        (wconf (current-window-configuration))
+        (ytr-update-node-behavior 'keep))
+    (switch-to-buffer-other-window (get-buffer-create "*YTR Edit Comment*"))
+    (insert
+     (if node-code
+         (alist-get 'text (ytr-retrieve-issue-comment-alist issue-node node-code))
+       (alist-get 'description (ytr-retrieve-issue-alist issue-code))))
+    (ytr-commit-update-node-mode)
+    (message "Edit node %s. C-c to submit, C-k to cancel" (ytr-issue-node-code-action issue-node-cons))
+    (setq-local ytr-buffer-position position
+                ytr-buffer-wconf wconf
+                ytr-buffer-commit-type 'update
+                ytr-buffer-node-type (if node-code 'comment 'description)
+                ytr-buffer-issue-code issue-code
+                ytr-buffer-node-code node-code)))
+
 (defun ytr-new-issue ()
   "Use the current subtree to create a new issue"
   (interactive)
