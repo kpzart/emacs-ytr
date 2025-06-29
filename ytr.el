@@ -1029,9 +1029,13 @@ nil."
           (progn
             (goto-char (match-beginning 0))
             (org-back-to-heading)
-            (switch-to-buffer (current-buffer)))
+            (switch-to-buffer (current-buffer))
+            )
         (goto-char initial-point)
-        (message "Issue Code not found.")))))
+        (when (and (not (string= "" ytr-capture-key))
+                   (y-or-n-p "Issue Code not found. Call Capture?"))
+          (ytr-capture-action issue-node-cons))
+        ))))
 
 ;;;;; query to org table
 (defun ytr-data-to-org-table (data)
