@@ -891,7 +891,7 @@ nil."
     (switch-to-buffer-other-window (get-buffer-create "*YTR Edit Comment*"))
     (insert
      (if node-code
-         (alist-get 'text (ytr-retrieve-issue-comment-alist issue-node node-code))
+         (alist-get 'text (ytr-retrieve-issue-comment-alist issue-code node-code)) ;; buggy, auch eine description hat einen node-code
        (alist-get 'description (ytr-retrieve-issue-alist issue-code))))
     (ytr-commit-update-node-mode)
     (message "Edit node %s. C-c to submit, C-k to cancel" (ytr-issue-node-code-action issue-node-cons))
@@ -1396,6 +1396,7 @@ which receives as argument den issue-alist."
 (ytr-define-action "org-capture" 'ytr-capture-action)
 (ytr-define-action "send-attachments" 'ytr-send-attachments-action)
 (ytr-define-action "quick-comment" 'ytr-quick-comment-action)
+(ytr-define-action "quick-node-edit" 'ytr-quick-node-edit-action)
 (ytr-define-action "find-org-node" 'ytr-find-org-node-action)
 
 ;;;; Issue buttons
