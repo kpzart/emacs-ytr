@@ -507,6 +507,7 @@ Preserves point."
       (goto-char (org-table-end)))))
 
 (defcustom ytr-save-import-diff-inline nil "Control wether an inline code block is written to each imported node." :type 'boolean :group 'ytr)
+(defcustom ytr-save-import-diff-inline-when-empty nil "Control wether an inline code block is written even if the diff is empty." :type 'boolean :group 'ytr)
 
 (defcustom ytr-import-diff-switches "--ignore-space-change" "Diff Switches used to create the import diff." :type 'string :group 'ytr)
 
@@ -561,15 +562,18 @@ conversion loss."
               (with-current-buffer diff-md-buffer
                 (write-region (point-min) (point-max) diff-file)
                 ))
-            (when ytr-save-import-diff-inline
-              (save-excursion
-                (goto-char (point-min))
-                (insert "#+name: ytr_import_diff\n")
-                (insert "#+begin_src diff\n")
-                (insert (with-current-buffer diff-md-buffer (buffer-string)))
-                (insert "#+end_src\n")
-                (insert "\n")
-                )))))
+            (let ((diff (with-current-buffer diff-md-buffer (buffer-string))))
+              (when (and ytr-save-import-diff-inline
+                         (or (not (string= "" diff))
+                             ytr-save-import-diff-inline-when-empty))
+                (save-excursion
+                  (goto-char (point-min))
+                  (insert "#+name: ytr_import_diff\n")
+                  (insert "#+begin_src diff\n")
+                  (insert diff)
+                  (insert "#+end_src\n")
+                  (insert "\n")
+                  ))))))
     (buffer-string)))
 
 (defun ytr-insert-issue-alist-as-org (issue-alist level)
