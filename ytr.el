@@ -616,7 +616,7 @@ conversion loss."
             .attachments)
       (insert "\n"))
     ;; do the description
-    (ytr-org-insert-node .description (+ 1 level) 'description .idReadable .id (alist-get 'fullName .reporter) .created .updated .attachments)
+    (ytr-org-insert-node .description (+ 1 level) 'description .idReadable nil (alist-get 'fullName .reporter) .created .updated .attachments)
     ;; do the comments
     (let ((issue-code .idReadable))
       (mapc (lambda (comment-alist)
@@ -690,7 +690,7 @@ long value"
       (goto-char start)
       (org-set-tags (list (capitalize type-string))))
     (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
-    (org-set-property "YTR_ISSUE_CODE" (format "%s#%s" issue-code node-code))
+    (org-set-property "YTR_ISSUE_CODE" (ytr-issue-node-code-action (cons issue-code node-code)))
     (org-set-property "YTR_NODE_TYPE" type-string)
     (org-set-property "YTR_CREATED_AT" (format-time-string "%Y-%m-%d %H:%M" (/ created 1000)))
     (when updated (org-set-property "YTR_UPDATED_AT" (format-time-string "%Y-%m-%d %H:%M" (/ updated 1000))))
@@ -786,7 +786,7 @@ nil."
          (ytr-org-insert-node .text curlevel 'comment issue-code new-node-code (alist-get 'fullName .author) .created .updated .attachments)
          (goto-char position))
        ))
-    (kill-new (format "%s#%s" issue-code new-node-code))
+    (kill-new (ytr-issue-node-code-action (cons issue-code new-node-code)))
     (ytr-issue-node-code-buttonize-buffer)))
 
 (defun ytr-commit-update-node ()
@@ -819,7 +819,7 @@ nil."
       (fetch
        (ytr-fetch-remote-node)
        ))
-    (kill-new (format "%s#%s" issue-code node-code))
+    (kill-new (ytr-issue-node-code-action (cons issue-code node-code)))
     (ytr-issue-node-code-buttonize-buffer)
     ))
 
@@ -998,7 +998,7 @@ nil."
     (ytr-issue-node-code-buttonize-buffer)
     (goto-char (point-min))
     (when node-code
-      (search-forward-regexp (format ":YTR_ISSUE_CODE: *%s#%s" issue-code node-code) nil t)
+      (search-forward-regexp (format ":YTR_ISSUE_CODE: *%s" (ytr-issue-node-code-action (cons issue-code node-code))) nil t)
       (org-back-to-heading))))
 
 (defun ytr-org-link-heading-action (issue-node-cons)
