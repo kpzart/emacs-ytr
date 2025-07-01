@@ -954,7 +954,7 @@ nil."
 (defun ytr-send-node ()
   "Create a new comment or update the node, depending on context."
   (interactive)
-  (if (org-entry-get (point) "YTR_NODE_TYPE" t)
+  (if (member (org-entry-get (point) "YTR_NODE_TYPE" t) (list "comment" "description"))
       (ytr-update-remote-node-editable)
     (ytr-new-comment-editable)))
 
