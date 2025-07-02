@@ -514,6 +514,10 @@ Preserves point."
 
 (defcustom ytr-import-diff-switches "--ignore-space-change" "Diff Switches used to create the import diff." :type 'string :group 'ytr)
 
+(defun ytr-trim-blank-lines-leading-and-trailing (content)
+  "Return a string where all blank lines at the beginning and the end of CONTENT are trimmed."
+  (replace-regexp-in-string "\n*[ \t\r\n]*\\'" "" (replace-regexp-in-string "\\`[ \t\r\n]*\n*" "" content)))
+
 (defun ytr-md-to-org (input level &optional diff-file)
   "Convert a markdown string to org mode using pandoc.
 
@@ -559,12 +563,10 @@ conversion loss."
               (goto-char (- (point-max) 1))
               (delete-line)
               (goto-char (- (point-max) 1))
-              (delete-line)
-              )
+              (delete-line))
             (when diff-file
               (with-current-buffer diff-md-buffer
-                (write-region (point-min) (point-max) diff-file)
-                ))
+                (write-region (point-min) (point-max) diff-file)))
             (let ((diff (with-current-buffer diff-md-buffer (buffer-string))))
               (when (and ytr-save-import-diff-inline
                          (or (not (string= "" diff))
@@ -575,8 +577,7 @@ conversion loss."
                   (insert "#+begin_src diff\n")
                   (insert diff)
                   (insert "#+end_src\n")
-                  (insert "\n")
-                  ))))))
+                  (insert "\n")))))))
     (buffer-string)))
 
 (defun ytr-insert-issue-alist-as-org (issue-alist level)
@@ -682,8 +683,10 @@ conversion loss."
 
 Level is that of the node, type is generic, author is a string, created is a
 long value"
-  (let ((start (point))
-        (type-string (format "%s" type)))
+  (let* ((start (point))
+         (type-string (format "%s" type))
+         (remote-content (or content ""))
+         (local-content (ytr-md-to-org remote-content (+ 1 level))))
     (open-line 1)  ;; need this to ensure props go to correct heading
     (insert (format "%s %s by %s\n\n"
                     (make-string level ?*)
@@ -692,16 +695,15 @@ long value"
     (save-excursion
       (goto-char start)
       (org-set-tags (list (capitalize type-string))))
-    (org-set-property "YTR_CONTENT_HASH" (if content (sha1 content) ""))
+    (org-set-property "YTR_REMOTE_CONTENT_HASH" (sha1 remote-content))
+    (org-set-property "YTR_LOCAL_CONTENT_HASH" (sha1 (ytr-trim-blank-lines-leading-and-trailing local-content)))
     (org-set-property "YTR_ISSUE_CODE" (ytr-issue-node-code-action issue-node-cons))
     (org-set-property "YTR_NODE_TYPE" type-string)
     (org-set-property "YTR_CREATED_AT" (format-time-string "%Y-%m-%d %H:%M" (/ created 1000)))
     (when updated (org-set-property "YTR_UPDATED_AT" (format-time-string "%Y-%m-%d %H:%M" (/ updated 1000))))
     (org-set-property "YTR_AUTHOR" author)
     (kill-whole-line)  ;; kill line we just opened
-    (when content (insert (ytr-md-to-org content (+ 1 level))))
-    ;; (unless (string= issue-code (org-entry-get (point) "YTR_ISSUE_CODE" t))  ;; dont see the sense of those lines, keep a while commented
-    ;;   (org-set-property "YTR_ISSUE_CODE" issue-code))
+    (insert local-content)
     (when (/= (length attachments) 0)
       (save-excursion
         (goto-char start)
@@ -761,7 +763,8 @@ nil."
         (curlevel ytr-buffer-curlevel)
         (text ytr-buffer-text)
         (position ytr-buffer-position)
-        (buffer (buffer-name)))
+        (buffer (buffer-name))
+        (local-content-hash ytr-local-content-hash))
     (message "New comment created on %s with node code %s." issue-code new-node-code)
     (set-window-configuration ytr-buffer-wconf)
     (kill-buffer buffer)
@@ -783,7 +786,8 @@ nil."
              (forward-char -1))
            (ytr-org-insert-node nil curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments)
            (goto-char position)
-           (org-set-property "YTR_CONTENT_HASH" (if .text (sha1 .text) ""))))
+           (org-set-property "YTR_REMOTE_CONTENT_HASH" (if .text (sha1 .text) ""))
+           (org-set-property "YTR_LOCAL_CONTENT_HASH" local-content-hash)))
         (kill (kill-region (point) (mark)))
         (fetch
          (let-alist (ytr-retrieve-issue-comment-alist (cons issue-code new-node-code))
@@ -799,7 +803,8 @@ nil."
         (node-code ytr-buffer-node-code)
         (node-type ytr-buffer-node-type)
         (position ytr-buffer-position)
-        (buffer (buffer-name)))
+        (buffer (buffer-name))
+        (local-content-hash ytr-local-content-hash))
     (cl-case ytr-buffer-node-type
       (description (ytr-send-issue-alist ytr-buffer-issue-code `((description . ,(buffer-string)))))
       (comment (ytr-send-issue-comment-alist (cons ytr-buffer-issue-code ytr-buffer-node-code) `((text . ,(buffer-string)))))
@@ -815,11 +820,12 @@ nil."
       (cl-case ytr-update-node-behavior
         (keep)
         (keep-content
-         (org-set-property "YTR_CONTENT_HASH"
+         (org-set-property "YTR_REMOTE_CONTENT_HASH"
                            (let ((content (cl-case node-type
                                             (description (alist-get 'description (ytr-retrieve-issue-alist issue-code)))
                                             (comment (alist-get 'text (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))))))
-                             (if content (sha1 content) ""))))
+                             (if content (sha1 content) "")))
+         (org-set-property "YTR_LOCAL_CONTENT_HASH" local-content-hash))
         (kill (org-cut-subtree))
         (fetch
          (ytr-fetch-remote-node)))
@@ -861,7 +867,8 @@ nil."
                 ytr-buffer-curlevel curlevel
                 ytr-buffer-issue-code issue-code
                 ytr-buffer-node-type 'comment
-                ytr-buffer-commit-type 'create)))
+                ytr-buffer-commit-type 'create
+                ytr-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text)))))
 
 (defun ytr-quick-comment-action (issue-node-cons)
   "Open a markdown buffer to write a quick comment."
@@ -934,13 +941,16 @@ nil."
                     (description (alist-get 'description (ytr-retrieve-issue-alist issue-code)))
                     (comment (alist-get 'text (ytr-retrieve-issue-comment-alist (cons issue-code node-code))))
                     (t (user-error (format "Unknown node type: %s" type)))))
-         (remote-hash (if content (sha1 content) ""))
-         (local-hash (org-entry-get (point) "YTR_CONTENT_HASH" t))
+         (current-remote-hash (if content (sha1 content) ""))
+         (import-remote-hash (org-entry-get (point) "YTR_REMOTE_CONTENT_HASH" t))
          (position (point))
          (wconf (current-window-configuration))
-         (attach-dir (or (org-attach-dir) "")))
-    (when (not (string= local-hash remote-hash))
-      (user-error "Aborted! Remote Node was edited since last fetch: %s %s" local-hash remote-hash))
+         (attach-dir (or (org-attach-dir) ""))
+         (text (save-excursion
+                 (org-mark-subtree)
+                 (buffer-substring-no-properties (region-beginning) (region-end)))))
+    (when (not (string= import-remote-hash current-remote-hash))
+      (user-error "Aborted! Remote Node was edited since last fetch: %s %s" import-remote-hash current-remote-hash))
     (org-gfm-export-as-markdown nil t)
     (ytr-perform-markdown-replacements attach-dir)
     (ytr-commit-update-node-mode)
@@ -950,7 +960,8 @@ nil."
                 ytr-buffer-commit-type 'update
                 ytr-buffer-node-type type
                 ytr-buffer-issue-code issue-code
-                ytr-buffer-node-code node-code)))
+                ytr-buffer-node-code node-code
+                ytr-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text)))))
 
 (defun ytr-send-node ()
   "Create a new comment or update the node, depending on context."
