@@ -44,6 +44,7 @@
 (require 'embark)
 (require 'consult)
 (require 'marginalia)
+(require 'diff)
 
 
 (defgroup ytr nil "Youtrack integration into emacs")
