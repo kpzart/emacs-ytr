@@ -745,16 +745,6 @@ nil."
     (set-window-configuration ytr-buffer-wconf)
     (kill-buffer buffer)))
 
-(defun ytr-remove-all-but-heading ()
-  "Remove all line except the first, if its an org heading"
-  (goto-char (point-min))
-  (when (org-at-heading-p)
-    (forward-line)
-    (while (and (>= (line-number-at-pos) (line-number-at-pos (window-end)))
-                (looking-at-p "\\s-*\\(:.*\\)?$"))
-      (forward-line)))
-  (kill-region (point) (point-max)))
-
 (defun ytr-commit-new-comment ()
   "Commit buffer content as a new comment"
   (interactive)
@@ -983,16 +973,18 @@ nil."
                             (t (ytr-retrieve-issue-alist issue-code))
                             ))
            (curlevel (org-current-level)))
-      (let ((inhibit-read-only t)
-            (inhibit-message t))
-        (org-cut-subtree)
-        (cl-case type
-          (description (let-alist content-alist
-                         (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments)))
-          (comment (let-alist content-alist
-                     (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments)))
-          (issue (ytr-insert-issue-alist-as-org content-alist curlevel))
-          (t (user-error "Bad node type %s" type)))))))
+      (when (or (not (ytr-node-locally-edited-p))
+                (y-or-n-p "Node was edited locally! Fetch anyway?"))
+        (let ((inhibit-read-only t)
+              (inhibit-message t))
+          (org-cut-subtree)
+          (cl-case type
+            (description (let-alist content-alist
+                           (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments)))
+            (comment (let-alist content-alist
+                       (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments)))
+            (issue (ytr-insert-issue-alist-as-org content-alist curlevel))
+            (t (user-error "Bad node type %s" type))))))))
 
 (defun ytr-org-action (issue-node-cons)
   ""
@@ -1062,6 +1054,50 @@ nil."
         (when (and (not (string= "" ytr-capture-key))
                    (y-or-n-p "Issue Code not found. Call Capture?"))
           (ytr-capture-action issue-node-cons))))))
+
+(defun ytr-org-skip-to-content ()
+  "Skip lines forward to a line that is neither the heading nor a property or blank line (beginning with :)."
+  (when (org-at-heading-p) ; skip only one heading
+    (forward-line))
+  (let ((max-line (line-number-at-pos (point-max))))
+    (while (and (< (line-number-at-pos) max-line)
+                (looking-at-p "\\s-*\\(:.*\\)?$"))
+      (forward-line))))
+
+(defun ytr-org-mark-inner-subtree ()
+  "Mark current subtree but exclude heading and properties.
+
+Special cases:
+- No content - works
+- imidiate subheading - works
+- end of buffer - works"
+
+  (let* ((subtree-start (progn
+                          (or (org-at-heading-p) (org-back-to-heading t))
+                          (point)))
+         (start (progn
+                  (goto-char subtree-start)
+                  (ytr-org-skip-to-content)
+                  (point)))
+         (end (progn
+                (goto-char subtree-start)
+                (org-end-of-subtree t))))
+    (when (< start end)
+      (set-mark end)
+      (goto-char start)
+      (cons start end))))
+
+
+(defun ytr-node-locally-edited-p ()
+  "Returns wether the hash of the current subtree differs from the hash in property."
+  (save-mark-and-excursion
+    (if (not (member (ytr-find-node) (list 'comment 'description)))
+        (user-error "No hashable node found")
+      (let* ((saved-local-hash (org-entry-get (point) "YTR_LOCAL_CONTENT_HASH" t))
+             (actual-local-hash (progn
+                                  (ytr-org-mark-inner-subtree)
+                                  (sha1 (ytr-trim-blank-lines-leading-and-trailing (buffer-substring-no-properties (region-beginning) (region-end)))))))
+        (not (string= saved-local-hash actual-local-hash))))))
 
 ;;;;; query to org table
 (defun ytr-data-to-org-table (data)
