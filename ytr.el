@@ -973,7 +973,7 @@ nil."
                             (t (ytr-retrieve-issue-alist issue-code))
                             ))
            (curlevel (org-current-level)))
-      (when (or (not (ytr-node-locally-edited-p))
+      (when (or (not (ytr-node-locally-edited-p t))
                 (y-or-n-p "Node was edited locally! Fetch anyway?"))
         (let ((inhibit-read-only t)
               (inhibit-message t))
@@ -1088,11 +1088,12 @@ Special cases:
       (cons start end))))
 
 
-(defun ytr-node-locally-edited-p ()
+(defun ytr-node-locally-edited-p (&optional false_if_no_node)
   "Returns wether the hash of the current subtree differs from the hash in property."
   (save-mark-and-excursion
     (if (not (member (ytr-find-node) (list 'comment 'description)))
-        (user-error "No hashable node found")
+        (when (not false_if_no_node)
+          (user-error "No hashable node found"))
       (let* ((saved-local-hash (org-entry-get (point) "YTR_LOCAL_CONTENT_HASH" t))
              (actual-local-hash (progn
                                   (ytr-org-mark-inner-subtree)
