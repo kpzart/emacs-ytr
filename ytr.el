@@ -92,6 +92,7 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 (defvar-local ytr-buffer-node-code nil "Buffer local var to store node-code")
 (defvar-local ytr-buffer-node-type nil "Buffer local var to store node-type")
 (defvar-local ytr-buffer-commit-type nil "Buffer local var to store commit-type")
+(defvar-local ytr-buffer-local-content-hash nil "Buffer local var to store local (org) content hash")
 
 ;;;; urls
 (defun ytr-issue-url (issue-code)
@@ -755,7 +756,7 @@ nil."
         (text ytr-buffer-text)
         (position ytr-buffer-position)
         (buffer (buffer-name))
-        (local-content-hash ytr-local-content-hash))
+        (local-content-hash ytr-buffer-local-content-hash))
     (message "New comment created on %s with node code %s." issue-code new-node-code)
     (set-window-configuration ytr-buffer-wconf)
     (kill-buffer buffer)
@@ -795,7 +796,7 @@ nil."
         (node-type ytr-buffer-node-type)
         (position ytr-buffer-position)
         (buffer (buffer-name))
-        (local-content-hash ytr-local-content-hash))
+        (local-content-hash ytr-buffer-local-content-hash))
     (cl-case ytr-buffer-node-type
       (description (ytr-send-issue-alist ytr-buffer-issue-code `((description . ,(buffer-string)))))
       (comment (ytr-send-issue-comment-alist (cons ytr-buffer-issue-code ytr-buffer-node-code) `((text . ,(buffer-string)))))
@@ -859,7 +860,7 @@ nil."
                 ytr-buffer-issue-code issue-code
                 ytr-buffer-node-type 'comment
                 ytr-buffer-commit-type 'create
-                ytr-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text)))))
+                ytr-buffer-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text)))))
 
 (defun ytr-quick-comment-action (issue-node-cons)
   "Open a markdown buffer to write a quick comment."
@@ -874,7 +875,8 @@ nil."
                 ytr-buffer-curlevel 0
                 ytr-buffer-issue-code issue-code
                 ytr-buffer-node-type 'comment
-                ytr-buffer-commit-type 'create)))
+                ytr-buffer-commit-type 'create
+                ytr-buffer-local-content-hash nil)))
 
 (defun ytr-quick-node-edit-action (issue-node-cons)
   "Open a markdown buffer to write a quick comment."
@@ -893,7 +895,8 @@ nil."
                 ytr-buffer-commit-type 'update
                 ytr-buffer-node-type (if node-code 'comment 'description)
                 ytr-buffer-issue-code issue-code
-                ytr-buffer-node-code node-code)))
+                ytr-buffer-node-code node-code
+                ytr-buffer-local-content-hash nil)))
 
 (defun ytr-new-issue ()
   "Use the current subtree to create a new issue"
@@ -952,7 +955,7 @@ nil."
                 ytr-buffer-node-type type
                 ytr-buffer-issue-code issue-code
                 ytr-buffer-node-code node-code
-                ytr-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text)))))
+                ytr-buffer-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text)))))
 
 (defun ytr-send-node ()
   "Create a new comment or update the node, depending on context."
