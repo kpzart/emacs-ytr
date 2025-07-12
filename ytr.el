@@ -524,7 +524,7 @@ Preserves point."
 LEVEL indicates the level of top level headings in org and defaults to 3.
 If DIFF-FILE is given, a diff file is written, that contains possible
 conversion loss."
-  (save-current-buffer
+  (save-excursion
     (let ((input-md-buffer (get-buffer-create "*ytr-input-md*"))
           (pandoc-org-buffer (get-buffer-create "*ytr-pandoc-org*"))
           (org-export-gfm-buffer (get-buffer-create "*ytr-org-export-gfm*"))
@@ -558,12 +558,13 @@ conversion loss."
             (let ((diff-switches ytr-import-diff-switches))
               (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer ))
             (with-current-buffer diff-md-buffer
-              (goto-char (point-min))
-              (delete-line)
-              (goto-char (- (point-max) 1))
-              (delete-line)
-              (goto-char (- (point-max) 1))
-              (delete-line))
+              (let ((inhibit-read-only t))
+                (goto-char (point-min))
+                (delete-line)
+                (goto-char (- (point-max) 1))
+                (delete-line)
+                (goto-char (- (point-max) 1))
+                (delete-line)))
             (when diff-file
               (with-current-buffer diff-md-buffer
                 (write-region (point-min) (point-max) diff-file)))
@@ -578,7 +579,7 @@ conversion loss."
                   (insert diff)
                   (insert "#+end_src\n")
                   (insert "\n")))))))
-    (buffer-string)))
+    (buffer-substring-no-properties (point-min) (point-max))))
 
 (defun ytr-insert-issue-alist-as-org (issue-alist level)
   "Insert the issue given by ISSUE-ALIST as org at point"
