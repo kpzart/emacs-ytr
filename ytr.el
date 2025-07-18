@@ -45,6 +45,7 @@
 (require 'consult)
 (require 'marginalia)
 (require 'diff)
+(require 'org)
 
 
 (defgroup ytr nil "Youtrack integration into emacs")
@@ -530,57 +531,55 @@ conversion loss."
           (pandoc-org-buffer (get-buffer-create "*ytr-pandoc-org*"))
           (org-export-gfm-buffer (get-buffer-create "*ytr-org-export-gfm*"))
           (diff-md-buffer (get-buffer-create "*ytr-diff-md*")))
-      (set-buffer pandoc-org-buffer)
-      (erase-buffer)
-      (insert input)
-      (shell-command-on-region (point-min) (point-max)
-                               (format "pandoc --wrap=preserve -f gfm -t org")
-                               nil t "*ytr-pandoc-error*")
-      (let ((inhibit-message t))
-        (replace-string "☒" "[X]" t (point-min) (point-max))
-        (replace-string "☐" "[ ]" t (point-min) (point-max)))
-      (goto-char (point-min))
-      (flush-lines " *:[A-Z_]+:.*$") ; remove properties
-      (goto-char (point-max))
-      (insert "\n")
-      (org-mode)
-      (ytr-demote-org-headings (or level 3))
-      (org-unindent-buffer)
-      (ytr-align-all-org-tables-in-buffer)
-      ;; now create the diff
-      (with-current-buffer input-md-buffer
+      (with-current-buffer pandoc-org-buffer
         (erase-buffer)
-        (insert input))
-      (let ((org-export-show-temporary-export-buffer nil))
-        (org-export-to-buffer 'gfm org-export-gfm-buffer))
-      (with-current-buffer org-export-gfm-buffer (ytr-perform-markdown-replacements "") )
-      (unwind-protect
-          (progn
-            (let ((diff-switches ytr-import-diff-switches))
-              (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer ))
+        (insert input)
+        (shell-command-on-region (point-min) (point-max)
+                                 (format "pandoc --wrap=preserve -f gfm -t org")
+                                 nil t "*ytr-pandoc-error*")
+        (let ((inhibit-message t))
+          (replace-string "☒" "[X]" t (point-min) (point-max))
+          (replace-string "☐" "[ ]" t (point-min) (point-max)))
+        (goto-char (point-min))
+        (flush-lines " *:[A-Z_]+:.*$") ; remove properties
+        (goto-char (point-max))
+        (insert "\n")
+        (org-mode)
+        (ytr-demote-org-headings (or level 3))
+        (org-unindent-buffer)
+        (ytr-align-all-org-tables-in-buffer)
+        (with-current-buffer input-md-buffer ;; store for diff
+          (erase-buffer)
+          (insert input))
+        (let ((org-export-show-temporary-export-buffer nil))
+          (org-export-to-buffer 'gfm org-export-gfm-buffer))
+        (with-current-buffer org-export-gfm-buffer (ytr-perform-markdown-replacements ""))
+        (when (or ytr-save-import-diff-inline diff-file)
+          (let ((diff-switches ytr-import-diff-switches))
+            (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer ))
+          (with-current-buffer diff-md-buffer
+            (let ((inhibit-read-only t))
+              (goto-char (point-min))
+              (delete-line)
+              (goto-char (- (point-max) 1))
+              (delete-line)
+              (goto-char (- (point-max) 1))
+              (delete-line)))
+          (when diff-file
             (with-current-buffer diff-md-buffer
-              (let ((inhibit-read-only t))
+              (write-region (point-min) (point-max) diff-file)))
+          (let ((diff (with-current-buffer diff-md-buffer (buffer-string))))
+            (when (and ytr-save-import-diff-inline
+                       (or (not (string= "" diff))
+                           ytr-save-import-diff-inline-when-empty))
+              (save-excursion
                 (goto-char (point-min))
-                (delete-line)
-                (goto-char (- (point-max) 1))
-                (delete-line)
-                (goto-char (- (point-max) 1))
-                (delete-line)))
-            (when diff-file
-              (with-current-buffer diff-md-buffer
-                (write-region (point-min) (point-max) diff-file)))
-            (let ((diff (with-current-buffer diff-md-buffer (buffer-string))))
-              (when (and ytr-save-import-diff-inline
-                         (or (not (string= "" diff))
-                             ytr-save-import-diff-inline-when-empty))
-                (save-excursion
-                  (goto-char (point-min))
-                  (insert "#+name: ytr_import_diff\n")
-                  (insert "#+begin_src diff\n")
-                  (insert diff)
-                  (insert "#+end_src\n")
-                  (insert "\n")))))))
-    (buffer-substring-no-properties (point-min) (point-max))))
+                (insert "#+name: ytr_import_diff\n")
+                (insert "#+begin_src diff\n")
+                (insert diff)
+                (insert "#+end_src\n")
+                (insert "\n")))))
+        (buffer-substring-no-properties (point-min) (point-max))))))
 
 (defun ytr-insert-issue-alist-as-org (issue-alist level)
   "Insert the issue given by ISSUE-ALIST as org at point"
@@ -706,6 +705,7 @@ long value"
     (org-set-property "YTR_AUTHOR" author)
     (kill-whole-line)  ;; kill line we just opened
     (insert local-content)
+    (insert "\n\n")
     (when (/= (length attachments) 0)
       (save-excursion
         (goto-char start)
@@ -944,7 +944,7 @@ nil."
                  (org-mark-subtree)
                  (buffer-substring-no-properties (region-beginning) (region-end)))))
     (when (not (string= import-remote-hash current-remote-hash))
-      (user-error "Aborted! Remote Node was edited since last fetch: %s %s" import-remote-hash current-remote-hash))
+      (user-error "Aborted! Remote Node was edited since last fetch: %s, %s" import-remote-hash current-remote-hash))
     (org-gfm-export-as-markdown nil t)
     (ytr-perform-markdown-replacements attach-dir)
     (ytr-commit-update-node-mode)
