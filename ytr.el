@@ -964,31 +964,32 @@ nil."
       (ytr-update-remote-node-editable)
     (ytr-new-comment-editable)))
 
-(defun ytr-fetch-remote-node ()
-  "Update a local node withs its remote content"
+(defun ytr-fetch-remote-node (&optional node-alist)
+  "Update a local node at point withs its remote content. If NODE-ALIST ist not given, it will be retrieved."
   (interactive)
   (save-excursion
-    (let* ((type (or (ytr-find-node) (user-error "Could not find a node to fetch")))
+    (let* ((node-type (or (ytr-find-node) (user-error "Could not find a node to fetch")))
            (issue-node-cons (ytr-issue-node-cons-from-org-property))
            (issue-code (car issue-node-cons))
            (node-code (cdr issue-node-cons))
-           (content-alist (cl-case type
-                            (comment (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))
-                            (t (ytr-retrieve-issue-alist issue-code))
-                            ))
            (curlevel (org-current-level)))
       (when (or (not (ytr-node-locally-edited-p t))
                 (y-or-n-p "Node was edited locally! Fetch anyway?"))
+        (unless node-alist
+          (setq node-alist (cl-case node-type
+                             (comment (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))
+                             (t (ytr-retrieve-issue-alist issue-code)))))
         (let ((inhibit-read-only t)
-              (inhibit-message t))
+              ;; (inhibit-message t)
+              )
           (org-cut-subtree)
-          (cl-case type
-            (description (let-alist content-alist
+          (cl-case node-type
+            (description (let-alist node-alist
                            (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments)))
-            (comment (let-alist content-alist
+            (comment (let-alist node-alist
                        (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments)))
-            (issue (ytr-insert-issue-alist-as-org content-alist curlevel))
-            (t (user-error "Bad node type %s" type))))))))
+            (issue (ytr-insert-issue-alist-as-org node-alist curlevel))
+            (t (user-error "Bad node type %s" node-type))))))))
 
 (defun ytr-org-action (issue-node-cons)
   ""
