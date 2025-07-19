@@ -940,7 +940,7 @@ nil."
          (position (point))
          (wconf (current-window-configuration))
          (attach-dir (or (org-attach-dir) ""))
-         (text (save-excursion
+         (text (save-mark-and-excursion
                  (org-mark-subtree)
                  (buffer-substring-no-properties (region-beginning) (region-end)))))
     (when (not (string= import-remote-hash current-remote-hash))
