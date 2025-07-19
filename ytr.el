@@ -705,7 +705,6 @@ long value"
     (org-set-property "YTR_AUTHOR" author)
     (kill-whole-line)  ;; kill line we just opened
     (insert local-content)
-    (insert "\n\n")
     (when (/= (length attachments) 0)
       (save-excursion
         (goto-char start)
