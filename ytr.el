@@ -1148,7 +1148,7 @@ Special cases:
                                           issue-properties)))
                               issues-alist))))
     (when (not no-query-keyword)
-      (insert (concat "#+ytr_query: " query "\n")))
+      (insert (concat "#+ytr-query: " query "\n")))
     (ytr-insert-and-align-org-table table-data)))
 
 (defun ytr-update-org-query-table ()
