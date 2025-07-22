@@ -720,15 +720,19 @@ long value"
                                           (point-min) (point-max))))
             attachments)))
 
-(defun ytr-find-node ()
+(defun ytr-find-node (&optional type-wanted)
   "Find the parent heading with a YTR_NODE_TYPE property.
 
-Sets the point and returns the type. If property is not found in buffer returns
-nil."
-  (when (or (org-at-heading-p) (org-back-to-heading))
-    (let ((type (org-entry-get (point) "YTR_NODE_TYPE")))
-      (if type (intern type)
-        (when (org-up-heading-safe) (ytr-find-node))))))
+Sets the point and returns the type. If property is not found in all higher headings returns
+nil and restore point. If TYPE-wanted is not nil search for that node type."
+  (let ((saved-point (point)))
+    (when (or (org-at-heading-p) (org-back-to-heading))
+      (let ((type-found (org-entry-get (point) "YTR_NODE_TYPE")))
+        (if (and type-found (or (not type-wanted)
+                                (eq type-wanted (intern type-found))))
+            (intern type-found)
+          (or (and (org-up-heading-safe) (ytr-find-node type-wanted))
+              (and (goto-char saved-point) nil)))))))
 
 ;;;; org interactive
 (defvar-keymap ytr-commit-new-comment-mode-map "C-c C-c" #'ytr-commit-new-comment "C-c C-k" #'ytr-cancel-commit)
