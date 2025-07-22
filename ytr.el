@@ -288,7 +288,7 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 (defun ytr-issue-node-cons-from-org-property ()
   "Return the issue code defined by an org property YTR_ISSUE_CODE or nil"
   (if (derived-mode-p 'org-mode)
-      (let ((issue-code (org-entry-get (point) "YTR_ISSUE_CODE" t)))
+      (let ((issue-code (org-entry-get (point) ytr-org-issue-code-property-name t)))
         (when issue-code (ytr-parse-issue-node-code issue-code)))
     nil))
 
@@ -500,6 +500,14 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
     (if (< 0 (length value-name)) value-name "-")))
 
 ;;;; org mode conversion
+(defconst ytr-org-issue-code-property-name "YTR_ISSUE_CODE" "Name of the property to store the org issue code")
+(defconst ytr-org-node-type-property-name "YTR_NODE_TYPE" "Name of the property to store the node type")
+(defconst ytr-org-local-content-hash-property-name "YTR_LOCAL_CONTENT_HASH" "Name of the property to store the local content hash")
+(defconst ytr-org-remote-content-hash-property-name "YTR_REMOTE_CONTENT_HASH" "Name of the property to store the remote content hash")
+(defconst ytr-org-author-property-name "YTR_AUTHOR" "Name of the property to store the remote content hash")
+(defconst ytr-org-created-at-property-name "YTR_CREATED_AT" "Name of the property to store the remote content hash")
+(defconst ytr-org-updated-at-property-name "YTR_UPDATED_AT" "Name of the property to store the remote content hash")
+
 (defun ytr-align-all-org-tables-in-buffer ()
   "Align all org tables in the current buffer, calling `org-table-align` once per table.
 Preserves point."
@@ -586,8 +594,8 @@ conversion loss."
   (let-alist issue-alist
     (insert (format "%s %s: %s\n\n" (make-string level ?*) .idReadable .summary))
     (open-line 1)  ;; need this to ensure props go to correct heading
-    (org-set-property "YTR_ISSUE_CODE" .idReadable)
-    (org-set-property "YTR_NODE_TYPE" "issue")
+    (org-set-property ytr-org-issue-code-property-name .idReadable)
+    (org-set-property ytr-org-node-type-property-name "issue")
     (kill-whole-line)  ;; kill line we just opened
     (insert (format "%s Links\n\n" (make-string (+ 1 level) ?*)))
     (mapc (lambda (link-alist)
@@ -640,8 +648,9 @@ conversion loss."
         (erase-buffer)
         (org-mode)
         (insert (concat "#+Title: " .idReadable ": " .summary "\n\n"))
-        (org-set-property "YTR_ISSUE_CODE" (format "%s" .idReadable))
-        (insert "#+COLUMNS: %50ITEM(Title) %16YTR_CREATED_AT(Created) %16YTR_UPDATED_AT(Updated) %20YTR_AUTHOR(Author) %12YTR_NODE_TYPE(Type)\n")
+        (org-set-property ytr-org-issue-code-property-name (format "%s" .idReadable))
+        (insert (format "#+COLUMNS: %%50ITEM(Title) %%16%s(Created) %%16%s(Updated) %%20%s(Author) %%12%s(Type)\n"
+                        ytr-org-created-at-property-name ytr-org-updated-at-property-name ytr-org-author-property-name ytr-org-node-type-property-name))
         (ytr-insert-issue-alist-as-org issue-alist 1)
         (switch-to-buffer bufname)))))
 
@@ -696,13 +705,13 @@ long value"
     (save-excursion
       (goto-char start)
       (org-set-tags (list (capitalize type-string))))
-    (org-set-property "YTR_REMOTE_CONTENT_HASH" (sha1 remote-content))
-    (org-set-property "YTR_LOCAL_CONTENT_HASH" (sha1 (ytr-trim-blank-lines-leading-and-trailing local-content)))
-    (org-set-property "YTR_ISSUE_CODE" (ytr-issue-node-code-action issue-node-cons))
-    (org-set-property "YTR_NODE_TYPE" type-string)
-    (org-set-property "YTR_CREATED_AT" (format-time-string "%Y-%m-%d %H:%M" (/ created 1000)))
-    (when updated (org-set-property "YTR_UPDATED_AT" (format-time-string "%Y-%m-%d %H:%M" (/ updated 1000))))
-    (org-set-property "YTR_AUTHOR" author)
+    (org-set-property ytr-org-remote-content-hash-property-name (sha1 remote-content))
+    (org-set-property ytr-org-local-content-hash-property-name (sha1 (ytr-trim-blank-lines-leading-and-trailing local-content)))
+    (org-set-property ytr-org-issue-code-property-name (ytr-issue-node-code-action issue-node-cons))
+    (org-set-property ytr-org-node-type-property-name type-string)
+    (org-set-property ytr-org-created-at-property-name (format-time-string "%Y-%m-%d %H:%M" (/ created 1000)))
+    (when updated (org-set-property ytr-org-updated-at-property-name (format-time-string "%Y-%m-%d %H:%M" (/ updated 1000))))
+    (org-set-property ytr-org-author-property-name author)
     (kill-whole-line)  ;; kill line we just opened
     (insert local-content)
     (when (/= (length attachments) 0)
@@ -727,7 +736,7 @@ Sets the point and returns the type. If property is not found in all higher head
 nil and restore point. If TYPE-wanted is not nil search for that node type."
   (let ((saved-point (point)))
     (when (or (org-at-heading-p) (org-back-to-heading))
-      (let ((type-found (org-entry-get (point) "YTR_NODE_TYPE")))
+      (let ((type-found (org-entry-get (point) ytr-org-node-type-property-name)))
         (if (and type-found (or (not type-wanted)
                                 (eq type-wanted (intern type-found))))
             (intern type-found)
@@ -781,8 +790,8 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
              (forward-char -1))
            (ytr-org-insert-node nil curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments)
            (goto-char position)
-           (org-set-property "YTR_REMOTE_CONTENT_HASH" (if .text (sha1 .text) ""))
-           (org-set-property "YTR_LOCAL_CONTENT_HASH" local-content-hash)))
+           (org-set-property ytr-org-remote-content-hash-property-name (if .text (sha1 .text) ""))
+           (org-set-property ytr-org-local-content-hash-property-name local-content-hash)))
         (kill (kill-region (point) (mark)))
         (fetch
          (let-alist (ytr-retrieve-issue-comment-alist (cons issue-code new-node-code))
@@ -815,12 +824,12 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
       (cl-case ytr-update-node-behavior
         (keep)
         (keep-content
-         (org-set-property "YTR_REMOTE_CONTENT_HASH"
+         (org-set-property ytr-org-remote-content-hash-property-name
                            (let ((content (cl-case node-type
                                             (description (alist-get 'description (ytr-retrieve-issue-alist issue-code)))
                                             (comment (alist-get 'text (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))))))
                              (if content (sha1 content) "")))
-         (org-set-property "YTR_LOCAL_CONTENT_HASH" local-content-hash))
+         (org-set-property ytr-org-local-content-hash-property-name local-content-hash))
         (kill (org-cut-subtree))
         (fetch
          (ytr-fetch-remote-node)))
@@ -939,7 +948,7 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
                     (comment (alist-get 'text (ytr-retrieve-issue-comment-alist (cons issue-code node-code))))
                     (t (user-error (format "Unknown node type: %s" type)))))
          (current-remote-hash (if content (sha1 content) ""))
-         (import-remote-hash (org-entry-get (point) "YTR_REMOTE_CONTENT_HASH" t))
+         (import-remote-hash (org-entry-get (point) ytr-org-remote-content-hash-property-name t))
          (position (point))
          (wconf (current-window-configuration))
          (attach-dir (or (org-attach-dir) ""))
@@ -963,7 +972,7 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
 (defun ytr-send-node ()
   "Create a new comment or update the node, depending on context."
   (interactive)
-  (if (member (org-entry-get (point) "YTR_NODE_TYPE" t) (list "comment" "description"))
+  (if (member (org-entry-get (point) ytr-org-node-type-property-name t) (list "comment" "description"))
       (ytr-update-remote-node-editable)
     (ytr-new-comment-editable)))
 
@@ -1004,13 +1013,13 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
     (ytr-issue-node-code-buttonize-buffer)
     (goto-char (point-min))
     (when node-code
-      (search-forward-regexp (format ":YTR_ISSUE_CODE: *%s" (ytr-issue-node-code-action (cons issue-code node-code))) nil t)
+      (search-forward-regexp (format ":%s: *%s" ytr-org-issue-code-property-name (ytr-issue-node-code-action (cons issue-code node-code))) nil t)
       (org-back-to-heading))))
 
 (defun ytr-org-link-heading-action (issue-node-cons)
   "Set Property YTR_ISSUE_CODE on org heading and append tag YTR"
   (save-excursion
-    (org-set-property "YTR_ISSUE_CODE" (car issue-node-cons))
+    (org-set-property ytr-org-issue-code-property-name (car issue-node-cons))
     (org-back-to-heading)
     (let ((tags (org-get-tags)))
       (if (member "YTR" tags) nil (org-set-tags (append (list "YTR") tags))))))
@@ -1051,7 +1060,7 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
   (with-current-buffer (find-file-noselect ytr-org-file)
     ;; do something with the buffer
     (let ((initial-point (point))
-          (regexp (format "^[   ]*:YTR_ISSUE_CODE:[   ]*%s$" (ytr-issue-node-code-action issue-node-cons))))
+          (regexp (format "^[   ]*:%s:[   ]*%s$" ytr-org-issue-code-property-name (ytr-issue-node-code-action issue-node-cons))))
       (goto-char (point-min))
       (if (re-search-forward regexp nil t)
           (progn
@@ -1102,7 +1111,7 @@ Special cases:
     (if (not (member (ytr-find-node) (list 'comment 'description)))
         (when (not false_if_no_node)
           (user-error "No hashable node found"))
-      (let* ((saved-local-hash (org-entry-get (point) "YTR_LOCAL_CONTENT_HASH" t))
+      (let* ((saved-local-hash (org-entry-get (point) ytr-org-local-content-hash-property-name t))
              (actual-local-hash (progn
                                   (ytr-org-mark-inner-subtree)
                                   (sha1 (ytr-trim-blank-lines-leading-and-trailing (buffer-substring-no-properties (region-beginning) (region-end)))))))
