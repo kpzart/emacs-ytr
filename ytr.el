@@ -823,21 +823,24 @@ is not nil search for that node type."
     (kill-buffer buffer)
     (kill-new (ytr-issue-node-code-action (cons issue-code node-code)))
     (when position ;; use position as flag for source buffer
-      (goto-char position)
-      (ytr-send-attachments-action (cons issue-code (when (eq node-type 'comment) node-code)))
-      (cl-case ytr-update-node-behavior
-        (keep)
-        (keep-content
-         (org-set-property ytr-org-remote-content-hash-property-name
-                           (let ((content (cl-case node-type
-                                            (description (alist-get 'description (ytr-retrieve-issue-alist issue-code)))
-                                            (comment (alist-get 'text (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))))))
-                             (if content (sha1 content) "")))
-         (org-set-property ytr-org-local-content-hash-property-name local-content-hash))
-        (kill (org-cut-subtree))
-        (fetch
-         (ytr-fetch-remote-node)))
-      (ytr-issue-node-code-buttonize-buffer))))
+      (save-excursion
+        (goto-char position)
+        (ytr-send-attachments-action (cons issue-code (when (eq node-type 'comment) node-code)))
+        (cl-case ytr-update-node-behavior
+          (keep)
+          (keep-content
+           (org-set-property ytr-org-remote-content-hash-property-name
+                             (let ((content (cl-case node-type
+                                              (description (alist-get 'description (ytr-retrieve-issue-alist issue-code)))
+                                              (comment (alist-get 'text (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))))))
+                               (if content (sha1 content) "")))
+           (org-set-property ytr-org-local-content-hash-property-name local-content-hash))
+          (kill
+           (org-mark-subtree)
+           (kill-region (point) (mark)))
+          (fetch
+           (ytr-fetch-remote-node)))
+        (ytr-issue-node-code-buttonize-buffer)))))
 
 (defun ytr-perform-markdown-replacements (attach-dir)
   (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
@@ -925,7 +928,8 @@ is not nil search for that node type."
                         (point)))
          (heading (buffer-substring heading-start heading-end))
          (title (org-get-heading t t t t)))
-    (org-cut-subtree)
+    (org-mark-subtree)
+    (kill-region (point) (mark))
     (with-temp-buffer
       (org-mode)
       (insert (pop kill-ring))
@@ -935,8 +939,7 @@ is not nil search for that node type."
         (org-gfm-export-as-markdown nil nil)
         (ytr-perform-markdown-replacements "")
         (whitespace-cleanup)
-        (ytr-browse-new-issue title (buffer-string))
-        ))
+        (ytr-browse-new-issue title (buffer-string))))
     (insert heading)
     (insert "/(Issue created from deleted content)/\n\n")))
 
@@ -1004,10 +1007,9 @@ is not nil search for that node type."
                                                                (t (user-error "Bad node type %s" node-type)))
                                                              node-alist))))
             (message "Node %s already up-to-date" (ytr-issue-node-code-action issue-node-cons))
-          (let ((inhibit-read-only t)
-                ;; (inhibit-message t)
-                )
-            (org-cut-subtree)
+          (let ((inhibit-read-only t))
+            (org-mark-subtree)
+            (kill-region (point) (mark))
             (cl-case node-type
               (description (let-alist node-alist
                              (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments)))
