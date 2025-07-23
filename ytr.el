@@ -48,7 +48,7 @@
 (require 'org)
 
 
-(defgroup ytr nil "Youtrack integration into emacs")
+(defgroup ytr nil "Youtrack integration into emacs" :group 'external)
 
 (defcustom ytr-baseurl "https://somewhere.youtrack.cloud" "Base url of your youtrack server" :type 'string :group 'ytr)
 
@@ -546,8 +546,8 @@ conversion loss."
         (unless (= 0 process-exit-status)
           (user-error "pandoc exited with error: %s" process-exit-status))
         (let ((inhibit-message t))
-          (replace-string "☒" "[X]" t (point-min) (point-max))
-          (replace-string "☐" "[ ]" t (point-min) (point-max)))
+          (replace-string-in-region "☒" "[X]" (point-min) (point-max))
+          (replace-string-in-region "☐" "[ ]" (point-min) (point-max)))
         (goto-char (point-min))
         (flush-lines " *:[A-Z_]+:.*$") ; remove properties
         (goto-char (point-max))
@@ -929,7 +929,7 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
       (kill-whole-line)
       (save-window-excursion
         (org-gfm-export-as-markdown nil nil)
-        (replace-regexp "^#" "##" nil (point-min) (point-max))
+        (ytr-perform-markdown-replacements "")
         (whitespace-cleanup)
         (ytr-browse-new-issue title (buffer-string))
         ))
