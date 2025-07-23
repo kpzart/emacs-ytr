@@ -976,7 +976,7 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
       (ytr-update-remote-node-editable)
     (ytr-new-comment-editable)))
 
-(defun ytr-fetch-remote-node (&optional node-alist)
+(defun ytr-fetch-remote-node (&optional node-alist trust-hash)
   "Update a local node at point withs its remote content. If NODE-ALIST ist not given, it will be retrieved."
   (interactive)
   (save-excursion
@@ -986,22 +986,30 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
            (node-code (cdr issue-node-cons))
            (curlevel (org-current-level)))
       (when (or (not (ytr-node-locally-edited-p t))
-                (y-or-n-p "Node was edited locally! Fetch anyway?"))
+                (and (y-or-n-p (format "Node %s was edited locally! Fetch anyway?" (ytr-issue-node-code-action issue-node-cons)))
+                     (or (setq trust-hash nil) t))) ; in this case, fetch even when remote hash is current, in order to restore remote content
         (unless node-alist
           (setq node-alist (cl-case node-type
                              (comment (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))
                              (t (ytr-retrieve-issue-alist issue-code)))))
-        (let ((inhibit-read-only t)
-              ;; (inhibit-message t)
-              )
-          (org-cut-subtree)
-          (cl-case node-type
-            (description (let-alist node-alist
-                           (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments)))
-            (comment (let-alist node-alist
-                       (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments)))
-            (issue (ytr-insert-issue-alist-as-org node-alist curlevel))
-            (t (user-error "Bad node type %s" node-type))))))))
+        (if (and trust-hash
+                 (not (ytr-node-remotely-edited-p (alist-get (cl-case node-type
+                                                               (comment 'text)
+                                                               (description 'description)
+                                                               (t (user-error "Bad node type %s" node-type)))
+                                                             node-alist))))
+            (message "Node %s already up-to-date" (ytr-issue-node-code-action issue-node-cons))
+          (let ((inhibit-read-only t)
+                ;; (inhibit-message t)
+                )
+            (org-cut-subtree)
+            (cl-case node-type
+              (description (let-alist node-alist
+                             (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments)))
+              (comment (let-alist node-alist
+                         (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments)))
+              (issue (ytr-insert-issue-alist-as-org node-alist curlevel))
+              (t (user-error "Bad node type %s" node-type)))))))))
 
 (defun ytr-org-action (issue-node-cons)
   ""
@@ -1106,7 +1114,7 @@ Special cases:
 
 
 (defun ytr-node-locally-edited-p (&optional false_if_no_node)
-  "Returns wether the hash of the current subtree differs from the hash in property."
+  "Returns wether the hash of the current subtree differs from the local hash in property."
   (save-mark-and-excursion
     (if (not (member (ytr-find-node) (list 'comment 'description)))
         (when (not false_if_no_node)
@@ -1116,6 +1124,18 @@ Special cases:
                                   (ytr-org-mark-inner-subtree)
                                   (sha1 (ytr-trim-blank-lines-leading-and-trailing (buffer-substring-no-properties (region-beginning) (region-end)))))))
         (not (string= saved-local-hash actual-local-hash))))))
+
+(defun ytr-node-remotely-edited-p (&optional remote-content false_if_no_node)
+  "Returns wether the hash of REMOTE-CONTENT differs from the remote hash in property. If REMOTE-CONTENT is nil it will be retrieved according to point (only works for comments!)"
+  (unless remote-content
+    (setq remote-content (alist-get 'text (ytr-retrieve-issue-comment-alist (ytr-guess-issue-node-cons)))))
+  (save-mark-and-excursion
+    (if (not (member (ytr-find-node) (list 'comment 'description)))
+        (when (not false_if_no_node)
+          (user-error "No hashable node found"))
+      (let* ((saved-remote-hash (org-entry-get (point) ytr-org-remote-content-hash-property-name t))
+             (actual-remote-hash (sha1 remote-content)))
+        (not (string= saved-remote-hash actual-remote-hash))))))
 
 ;;;;; query to org table
 (defun ytr-data-to-org-table (data)
@@ -1218,6 +1238,7 @@ Special cases:
 
 (defun ytr-merge-issue-node ()
   "Find the issue node at point, call fetch for all subnodes, that are not locally edited and append missing nodes. Skip subheadings that are no ytr nodes."
+  (interactive)
   (save-mark-and-excursion
     (when (ytr-find-node 'issue)
       (let* ((issue-code (car (ytr-issue-node-cons-from-org-property)))
@@ -1243,7 +1264,8 @@ Special cases:
                                                                           (string= (alist-get 'id comment-alist) node-code))
                                                                         (alist-get 'comments issue-alist))
                                                             (signal 'ytr-key-error issue-node-code)))
-                                               (t (user-error "Bad note type %s" node-type))))
+                                               (t (user-error "Bad note type %s" node-type)))
+                                             'trust-hash)
                     (ytr-key-error (message "Ignoring unknown node %s" (cdr err))))
                   (goto-char current-point) ; for some reason save-excursion does not work reliably here (maybe because buffer shrinks)
                   ))))
