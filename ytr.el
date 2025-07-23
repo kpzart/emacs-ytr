@@ -135,7 +135,8 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
                                (all-completions str choices pred))))))
 
 (defun ytr-get-issue-activity (issue-alist)
-  "Return the most recent timestamp of an issue with an info string as cons (info . ts)"
+  "Return the most recent timestamp of an issue with an info string
+as cons (info . ts)"
   (let-alist issue-alist
     (if .resolved (cons "resolved" .resolved)
       (if (and .updated (> (- .updated 10000) .created)) (cons "updated" .updated)
@@ -509,7 +510,8 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 (defconst ytr-org-updated-at-property-name "YTR_UPDATED_AT" "Name of the property to store the remote content hash")
 
 (defun ytr-align-all-org-tables-in-buffer ()
-  "Align all org tables in the current buffer, calling `org-table-align` once per table.
+  "Align all org tables in the current buffer, calling
+ `org-table-align` once per table.
 Preserves point."
   (interactive)
   (save-excursion
@@ -525,7 +527,8 @@ Preserves point."
 (defcustom ytr-import-diff-switches "--ignore-space-change" "Diff Switches used to create the import diff." :type 'string :group 'ytr)
 
 (defun ytr-trim-blank-lines-leading-and-trailing (content)
-  "Return a string where all blank lines at the beginning and the end of CONTENT are trimmed."
+  "Return a string where all blank lines at the beginning and the
+ end of CONTENT are trimmed."
   (replace-regexp-in-string "\n*[ \t\r\n]*\\'" "" (replace-regexp-in-string "\\`[ \t\r\n]*\n*" "" content)))
 
 (defun ytr-md-to-org (input level &optional diff-file)
@@ -732,8 +735,9 @@ long value"
 (defun ytr-find-node (&optional type-wanted)
   "Find the parent heading with a YTR_NODE_TYPE property.
 
-Sets the point and returns the type. If property is not found in all higher headings returns
-nil and restore point. If TYPE-wanted is not nil search for that node type."
+Sets the point and returns the type. If property is not found in
+all higher headings returns nil and restore point. If TYPE-wanted
+is not nil search for that node type."
   (let ((saved-point (point)))
     (when (or (org-at-heading-p) (org-back-to-heading))
       (let ((type-found (org-entry-get (point) ytr-org-node-type-property-name)))
@@ -977,7 +981,8 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
     (ytr-new-comment-editable)))
 
 (defun ytr-fetch-remote-node (&optional node-alist trust-hash)
-  "Update a local node at point withs its remote content. If NODE-ALIST ist not given, it will be retrieved."
+  "Update a local node at point withs its remote content. If
+ NODE-ALIST ist not given, it will be retrieved."
   (interactive)
   (save-excursion
     (let* ((node-type (or (ytr-find-node) (user-error "Could not find a node to fetch")))
@@ -1081,7 +1086,8 @@ nil and restore point. If TYPE-wanted is not nil search for that node type."
           (ytr-capture-action issue-node-cons))))))
 
 (defun ytr-org-skip-to-content ()
-  "Skip lines forward to a line that is neither the heading nor a property or blank line (beginning with :)."
+  "Skip lines forward to a line that is neither the heading nor a
+ property or blank line (beginning with :)."
   (when (org-at-heading-p) ; skip only one heading
     (forward-line))
   (let ((max-line (line-number-at-pos (point-max))))
@@ -1114,7 +1120,8 @@ Special cases:
 
 
 (defun ytr-node-locally-edited-p (&optional false_if_no_node)
-  "Returns wether the hash of the current subtree differs from the local hash in property."
+  "Returns wether the hash of the current subtree differs from
+ the local hash in property."
   (save-mark-and-excursion
     (if (not (member (ytr-find-node) (list 'comment 'description)))
         (when (not false_if_no_node)
@@ -1126,7 +1133,9 @@ Special cases:
         (not (string= saved-local-hash actual-local-hash))))))
 
 (defun ytr-node-remotely-edited-p (&optional remote-content false_if_no_node)
-  "Returns wether the hash of REMOTE-CONTENT differs from the remote hash in property. If REMOTE-CONTENT is nil it will be retrieved according to point (only works for comments!)"
+  "Returns wether the hash of REMOTE-CONTENT differs from the
+ remote hash in property. If REMOTE-CONTENT is nil it will be
+ retrieved according to point (only works for comments!)"
   (unless remote-content
     (setq remote-content (alist-get 'text (ytr-retrieve-issue-comment-alist (ytr-guess-issue-node-cons)))))
   (save-mark-and-excursion
@@ -1237,7 +1246,9 @@ Special cases:
 (define-error 'ytr-key-error "Key not found" 'error)
 
 (defun ytr-merge-issue-node ()
-  "Find the issue node at point, call fetch for all subnodes, that are not locally edited and append missing nodes. Skip subheadings that are no ytr nodes."
+  "Find the issue node at point, call fetch for all subnodes, that
+are not locally edited and append missing nodes. Skip subheadings
+that are no ytr nodes."
   (interactive)
   (save-mark-and-excursion
     (when (ytr-find-node 'issue)
@@ -1470,29 +1481,33 @@ which receives as argument den issue-alist."
     (ytr-org-link-heading-action issue-node-cons)))
 
 ;;;; actions
+;; Like base form of action but with simple prompt for issue-node-code. It may have a node code.
 (defmacro ytr-define-dart-action (name action)
   `(defun ,(intern (format "ytr-dart-%s" name)) (issue-node-code)
-     ,(format "Like ytr-%s but with simple prompt for issue-node-code.\n It may have a node code." name)
+     ,(format "Dart form of %s" name)
      (interactive "sIssue Code (may also have Node Code): ")
      (funcall ,action (ytr-parse-issue-node-code issue-node-code))))
 
+;; Like dart form of action but cand consists of issue code and summary
 (defmacro ytr-define-embark-action (name action)
   `(defun ,(intern (format "ytr-embark-%s" name)) (cand)
-     ,(format "Like ytr-dart-%s but cand consists of issue code and summary" name)
+     ,(format "Embark form of %s" name)
      (funcall ,action (ytr-parse-issue-node-code (car (split-string cand ":"))))))
 
+;; Retrieve an issue from query and call the action on it
 (defmacro ytr-define-base-action (name action)
   `(defun ,(intern (format "ytr-%s" name)) (issue-code)
-     ,(format "Retrieve an issue from user input and call the %s action on it" name)
+     ,(format "Base form of %s" name)
      (interactive (list
                    (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
                      (ytr-read-issue-code))))
      (ytr-add-issue-to-history issue-code)
      (funcall ,action (cons issue-code nil))))
 
+;; Guess an issue by context and call the action on it
 (defmacro ytr-define-smart-action (name action)
   `(defun ,(intern (format "ytr-smart-%s" name)) (issue-node-code)
-     ,(format "Guess an issue by context and call the %s action on it" name)
+     ,(format "Smart form of %s" name)
      (interactive (list (ytr-guess-or-read-issue-node-cons)))
      (ytr-add-issue-to-history (car issue-node-code))
      (funcall ,action issue-node-code)))
