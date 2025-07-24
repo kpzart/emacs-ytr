@@ -770,7 +770,8 @@ is not nil search for that node type."
 (defun ytr-commit-new-comment ()
   "Commit buffer content as a new comment"
   (interactive)
-  (let ((new-node-code (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-code `((text . ,(buffer-string))))))
+  (let ((new-node-code (or (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-code `((text . ,(buffer-string)))))
+                           (user-error "No node code retrieved")))
         (issue-code ytr-buffer-issue-code) ;; These vars are buffer local and we are going to switch buffer
         (curlevel ytr-buffer-curlevel)
         (text ytr-buffer-text)
@@ -781,32 +782,33 @@ is not nil search for that node type."
     (set-window-configuration ytr-buffer-wconf)
     (kill-buffer buffer)
     (kill-new (ytr-issue-node-code-action (cons issue-code new-node-code)))
+    (ytr-add-issue-to-history issue-code)
     (when position ;; use position as flag for source buffer
-      (goto-char position)
-      (set-mark (+ position (length text)))
-      (ytr-add-issue-to-history issue-code)
-      (unless new-node-code (user-error "No node code retrieved"))
-      (if (derived-mode-p 'org-mode)
-          (ytr-send-attachments-action (cons issue-code new-node-code)))
-      (cl-case ytr-new-comment-behavior
-        (keep (deactivate-mark))
-        (keep-content
-         (let-alist (ytr-retrieve-issue-comment-alist (cons issue-code new-node-code))
-           (deactivate-mark)
-           (when (looking-at-p "\*+ ")
-             (insert "*")
-             (forward-char -1))
-           (ytr-org-insert-node nil curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments)
-           (goto-char position)
-           (org-set-property ytr-org-remote-content-hash-property-name (if .text (sha1 .text) ""))
-           (org-set-property ytr-org-local-content-hash-property-name local-content-hash)))
-        (kill (kill-region (point) (mark)))
-        (fetch
-         (let-alist (ytr-retrieve-issue-comment-alist (cons issue-code new-node-code))
-           (kill-region (point) (mark))
-           (ytr-org-insert-node .text curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments)
-           (goto-char position))))
-      (ytr-issue-node-code-buttonize-buffer))))
+      (save-mark-and-excursion
+        (if (derived-mode-p 'org-mode)
+            (ytr-send-attachments-action (cons issue-code new-node-code)))
+        (goto-char position)
+        (set-mark (+ position (length text)))
+        (cl-case ytr-new-comment-behavior
+          (keep (deactivate-mark))
+          (keep-content
+           (let-alist (ytr-retrieve-issue-comment-alist (cons issue-code new-node-code))
+             (deactivate-mark)
+             (when (looking-at-p "\*+ ")
+               (insert "*"))
+             (goto-char position)
+             (ytr-org-insert-node nil curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments)
+             (setq local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing (buffer-substring-no-properties (point) (org-end-of-subtree)))))
+             (goto-char position)
+             (org-set-property ytr-org-remote-content-hash-property-name (if .text (sha1 .text) ""))
+             (org-set-property ytr-org-local-content-hash-property-name local-content-hash)))
+          (kill (kill-region (point) (mark)))
+          (fetch
+           (let-alist (ytr-retrieve-issue-comment-alist (cons issue-code new-node-code))
+             (kill-region (point) (mark))
+             (ytr-org-insert-node .text curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments)
+             (goto-char position))))
+        (ytr-issue-node-code-buttonize-buffer)))))
 
 (defun ytr-commit-update-node ()
   "Commit the buffer to youtrack to update a node"
@@ -862,28 +864,29 @@ is not nil search for that node type."
 (defun ytr-new-comment-editable ()
   "Send the current subtree or region as comment to a ticket"
   (interactive)
-  (unless (region-active-p)
-    (org-mark-subtree)
-    (or (org-at-heading-p) (org-back-to-heading)))
-  (when (> (point) (mark)) (exchange-point-and-mark))
-  (let ((position (point))
-        (text (buffer-substring-no-properties (region-beginning) (region-end)))
-        (wconf (current-window-configuration))
-        (issue-code (ytr-guess-or-read-issue-code))
-        (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
-        (attach-dir (or (org-attach-dir) "")))
-    (org-gfm-export-as-markdown nil nil)
-    (ytr-perform-markdown-replacements attach-dir)
-    (ytr-commit-new-comment-mode)
-    (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-code)
-    (setq-local ytr-buffer-position position
-                ytr-buffer-text text
-                ytr-buffer-wconf wconf
-                ytr-buffer-curlevel curlevel
-                ytr-buffer-issue-code issue-code
-                ytr-buffer-node-type 'comment
-                ytr-buffer-commit-type 'create
-                ytr-buffer-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text)))))
+  (save-mark-and-excursion
+    (unless (region-active-p)
+      (org-mark-subtree)
+      (or (org-at-heading-p) (org-back-to-heading)))
+    (when (> (point) (mark)) (exchange-point-and-mark))
+    (let ((position (point))
+          (text (buffer-substring-no-properties (region-beginning) (region-end)))
+          (wconf (current-window-configuration))
+          (issue-code (ytr-guess-or-read-issue-code))
+          (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
+          (attach-dir (or (org-attach-dir) "")))
+      (org-gfm-export-as-markdown nil nil)
+      (ytr-perform-markdown-replacements attach-dir)
+      (ytr-commit-new-comment-mode)
+      (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-code)
+      (setq-local ytr-buffer-position position
+                  ytr-buffer-text text
+                  ytr-buffer-wconf wconf
+                  ytr-buffer-curlevel curlevel
+                  ytr-buffer-issue-code issue-code
+                  ytr-buffer-node-type 'comment
+                  ytr-buffer-commit-type 'create
+                  ytr-buffer-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text))))))
 
 (defun ytr-quick-comment-action (issue-node-cons)
   "Open a markdown buffer to write a quick comment."
@@ -939,7 +942,7 @@ the beginning of the next heading."
   (interactive)
   (org-back-to-heading)
   (let* ((heading-start (point))
-         (heading-end ((ytr-org-content-start)))
+         (heading-end (ytr-org-content-start))
          (heading (buffer-substring heading-start heading-end))
          (title (org-get-heading t t t t)))
     (org-mark-subtree)
