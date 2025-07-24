@@ -713,8 +713,9 @@ long value"
   (let* ((start (point))
          (type-string (format "%s" type))
          (remote-content (or content ""))
-         (local-content (ytr-org-perform-attachment-replacements-import (ytr-md-to-org remote-content (+ 1 level))
-                                                                        attachments)))
+         (local-content (ytr-trim-blank-lines-leading-and-trailing
+                         (ytr-org-perform-attachment-replacements-import (ytr-md-to-org remote-content (+ 1 level))
+                                                                         attachments))))
     (open-line 1)  ;; need this to ensure props go to correct heading
     (insert (format "%s %s by %s\n\n"
                     (make-string level ?*)
@@ -726,15 +727,16 @@ long value"
       (when (/= (length attachments) 0)
         (org-set-tags (append (org-get-tags) '("YTR_ATTACH")))))
     (org-set-property ytr-org-remote-content-hash-property-name (sha1 remote-content))
-    (org-set-property ytr-org-local-content-hash-property-name (sha1 (ytr-trim-blank-lines-leading-and-trailing local-content)))
+    (org-set-property ytr-org-local-content-hash-property-name (sha1 local-content))
     (org-set-property ytr-org-issue-code-property-name (ytr-issue-node-code-action issue-node-cons))
     (org-set-property ytr-org-node-type-property-name type-string)
     (org-set-property ytr-org-created-at-property-name (format-time-string "%Y-%m-%d %H:%M" (/ created 1000)))
     (when updated (org-set-property ytr-org-updated-at-property-name (format-time-string "%Y-%m-%d %H:%M" (/ updated 1000))))
     (org-set-property ytr-org-author-property-name author)
     (kill-whole-line)  ;; kill line we just opened
-    (insert local-content)
-    ))
+    (unless (string= local-content "")
+      (insert local-content)
+      (insert "\n\n"))))
 
 (defun ytr-find-node (&optional type-wanted)
   "Find the parent heading with a YTR_NODE_TYPE property.
