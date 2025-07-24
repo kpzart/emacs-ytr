@@ -917,15 +917,25 @@ is not nil search for that node type."
                 ytr-buffer-node-code node-code
                 ytr-buffer-local-content-hash nil)))
 
+(defun ytr-org-content-start (&optional ensure-content)
+  "Return the start of the real content of a heading,
+skipping the headline, properties and blink lines. When no
+heading was found, return nil if ENSURE-CONTENT is not nil, or
+the beginning of the next heading."
+  (save-excursion
+    (unless (org-at-heading-p) (org-back-to-heading))
+    (let ((level (org-current-level)))
+      (forward-line)
+      (while (looking-at-p "\\s-*\\(:.*\\)?$") (forward-line))
+      (unless (and ensure-content (org-at-heading-p) (<= (org-current-level) level))
+        (point)))))
+
 (defun ytr-new-issue ()
   "Use the current subtree to create a new issue"
   (interactive)
   (org-back-to-heading)
   (let* ((heading-start (point))
-         (heading-end (progn
-                        (forward-line)
-                        (while (looking-at-p "\\s-*\\(:.*\\)?$") (forward-line))
-                        (point)))
+         (heading-end ((ytr-org-content-start)))
          (heading (buffer-substring heading-start heading-end))
          (title (org-get-heading t t t t)))
     (org-mark-subtree)
@@ -960,8 +970,7 @@ is not nil search for that node type."
          (wconf (current-window-configuration))
          (attach-dir (or (org-attach-dir) ""))
          (text (save-mark-and-excursion
-                 (org-mark-subtree)
-                 (buffer-substring-no-properties (region-beginning) (region-end)))))
+                 (buffer-substring-no-properties (ytr-org-content-start) (org-end-of-subtree)))))
     (when (not (string= import-remote-hash current-remote-hash))
       (user-error "Aborted! Remote Node was edited since last fetch: %s, %s" import-remote-hash current-remote-hash))
     (org-gfm-export-as-markdown nil t)
