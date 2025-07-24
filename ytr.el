@@ -463,11 +463,11 @@ as cons (info . ts)"
 
 (defun ytr-retrieve-issue-alist (issue-code)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-request "GET" (concat ytr-baseurl "/api/issues/" issue-code "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType,comment(id))")))
+  (ytr-request "GET" (concat ytr-baseurl "/api/issues/" issue-code "?fields=id,idReadable,summary,description,comments(id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType),deleted),created,updated,resolved,reporter(login,fullName),links(direction,linkType(name,sourceToTarget,targetToSource),issues(idReadable,summary)),customFields(name,value(name)),attachments(name,url,size,mimeType,comment(id))")))
 
 (defun ytr-retrieve-issue-comment-alist (issue-node-cons)
   "Retrieve information concering the given issue and return an alist."
-  (ytr-request "GET" (concat ytr-baseurl "/api/issues/" (car issue-node-cons) "/comments/" (cdr issue-node-cons) "?fields=id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType)")))
+  (ytr-request "GET" (concat ytr-baseurl "/api/issues/" (car issue-node-cons) "/comments/" (cdr issue-node-cons) "?fields=id,text,created,updated,author(login,fullName),attachments(name,url,size,mimeType),deleted")))
 
 (defun ytr-send-new-comment-alist (issue-code alist)
   "Send the information in ALIST as a new comment for ticket with id ISSUE-CODE"
@@ -632,12 +632,13 @@ conversion loss."
             .attachments)
       (insert "\n"))
     ;; do the description
-    (ytr-org-insert-node .description (+ 1 level) 'description (cons .idReadable nil) (alist-get 'fullName .reporter) .created .updated .attachments)
+    (ytr-org-insert-node .description (+ 1 level) 'description (cons .idReadable nil) (alist-get 'fullName .reporter) .created .updated .attachments nil)
     ;; do the comments
     (let ((issue-code .idReadable))
       (mapc (lambda (comment-alist)
               (let-alist comment-alist
-                (ytr-org-insert-node .text (+ 1 level) 'comment (cons issue-code .id) (alist-get 'fullName .author) .created .updated .attachments)))
+                (when (not (eq .deleted t))
+                  (ytr-org-insert-node .text (+ 1 level) 'comment (cons issue-code .id) (alist-get 'fullName .author) .created .updated .attachments .deleted))))
             .comments))
     ;; postprocess
     (org-unindent-buffer)))
@@ -705,7 +706,7 @@ at the remote issue. Returns the resulting content."
         attachments)
   org-content)
 
-(defun ytr-org-insert-node (content level type issue-node-cons author created updated attachments)
+(defun ytr-org-insert-node (content level type issue-node-cons author created updated attachments deleted)
   "Insert a node at point.
 
 Level is that of the node, type is generic, author is a string, created is a
@@ -724,6 +725,8 @@ long value"
     (save-excursion
       (goto-char start)
       (org-set-tags (list (capitalize type-string)))
+      (when (eq deleted t)
+        (org-set-tags (append (org-get-tags) '("YTR_DETELED"))))
       (when (/= (length attachments) 0)
         (org-set-tags (append (org-get-tags) '("YTR_ATTACH")))))
     (org-set-property ytr-org-remote-content-hash-property-name (sha1 remote-content))
@@ -799,7 +802,7 @@ is not nil search for that node type."
              (when (looking-at-p "\*+ ")
                (insert "*"))
              (goto-char position)
-             (ytr-org-insert-node nil curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments)
+             (ytr-org-insert-node nil curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments .deleted)
              (setq local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing (buffer-substring-no-properties (point) (org-end-of-subtree)))))
              (goto-char position)
              (org-set-property ytr-org-remote-content-hash-property-name (if .text (sha1 .text) ""))
@@ -808,7 +811,7 @@ is not nil search for that node type."
           (fetch
            (let-alist (ytr-retrieve-issue-comment-alist (cons issue-code new-node-code))
              (kill-region (point) (mark))
-             (ytr-org-insert-node .text curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments)
+             (ytr-org-insert-node .text curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments .deleted)
              (goto-char position))))
         (ytr-issue-node-code-buttonize-buffer)))))
 
@@ -1019,20 +1022,21 @@ the beginning of the next heading."
                              (comment (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))
                              (t (ytr-retrieve-issue-alist issue-code)))))
         (if (and trust-hash
-                 (not (ytr-node-remotely-edited-p (alist-get (cl-case node-type
-                                                               (comment 'text)
-                                                               (description 'description)
-                                                               (t (user-error "Bad node type %s" node-type)))
-                                                             node-alist))))
+                 (not (ytr-node-remotely-edited-p (or (alist-get (cl-case node-type
+                                                                   (comment 'text)
+                                                                   (description 'description)
+                                                                   (t (user-error "Bad node type %s" node-type)))
+                                                                 node-alist)
+                                                      ""))))
             (message "Node %s already up-to-date" (ytr-issue-node-code-action issue-node-cons))
           (let ((inhibit-read-only t))
             (org-mark-subtree)
             (kill-region (point) (mark))
             (cl-case node-type
               (description (let-alist node-alist
-                             (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments)))
+                             (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments nil)))
               (comment (let-alist node-alist
-                         (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments)))
+                         (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments .deleted)))
               (issue (ytr-insert-issue-alist-as-org node-alist curlevel))
               (t (user-error "Bad node type %s" node-type)))))))))
 
@@ -1303,9 +1307,10 @@ that are no ytr nodes."
           (goto-char end)
           (mapcar (lambda (comment-alist)
                     (let-alist comment-alist
-                      (ytr-org-insert-node .text (+ 1 level) 'comment (cons issue-code .id) (alist-get 'fullName .author) .created .updated .attachments)))
+                      (ytr-org-insert-node .text (+ 1 level) 'comment (cons issue-code .id) (alist-get 'fullName .author) .created .updated .attachments .deleted)))
                   (seq-filter (lambda (comment-alist)
-                                (not (member (alist-get 'id comment-alist) processed-node-codes)))
+                                (not (or (member (alist-get 'id comment-alist) processed-node-codes)
+                                         (eq (alist-get 'deleted comment-alist) t))))
                               (alist-get 'comments issue-alist))))))))
 
 
