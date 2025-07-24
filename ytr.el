@@ -691,6 +691,20 @@ conversion loss."
              (new-heading (concat (make-string new-level ?*) " ")))
         (replace-match new-heading)))))
 
+(defun ytr-org-perform-attachment-replacements-import (org-content attachments)
+  "Replaces Links in the imported org content to attachments found
+at the remote issue. Returns the resulting content."
+  (mapc (lambda (attachment-alist)
+          (let-alist attachment-alist
+            (setq org-content (string-replace (format "[[file:%s]]" .name)
+                                              (format "[[%s%s&forceDownload=true&ytr_name=%s][%s]]" ytr-baseurl .url .name .name)
+                                              org-content))
+            (setq org-content (string-replace (format "\\[\\[file:%s]\\[\\(.*\\)]]" .name)
+                                              (format "[[%s%s&forceDownload=true&ytr_name=%s][\\1]]" ytr-baseurl .url .name)
+                                              org-content))))
+        attachments)
+  org-content)
+
 (defun ytr-org-insert-node (content level type issue-node-cons author created updated attachments)
   "Insert a node at point.
 
@@ -699,7 +713,8 @@ long value"
   (let* ((start (point))
          (type-string (format "%s" type))
          (remote-content (or content ""))
-         (local-content (ytr-md-to-org remote-content (+ 1 level))))
+         (local-content (ytr-org-perform-attachment-replacements-import (ytr-md-to-org remote-content (+ 1 level))
+                                                                        attachments)))
     (open-line 1)  ;; need this to ensure props go to correct heading
     (insert (format "%s %s by %s\n\n"
                     (make-string level ?*)
@@ -707,7 +722,9 @@ long value"
                     author))
     (save-excursion
       (goto-char start)
-      (org-set-tags (list (capitalize type-string))))
+      (org-set-tags (list (capitalize type-string)))
+      (when (/= (length attachments) 0)
+        (org-set-tags (append (org-get-tags) '("YTR_ATTACH")))))
     (org-set-property ytr-org-remote-content-hash-property-name (sha1 remote-content))
     (org-set-property ytr-org-local-content-hash-property-name (sha1 (ytr-trim-blank-lines-leading-and-trailing local-content)))
     (org-set-property ytr-org-issue-code-property-name (ytr-issue-node-code-action issue-node-cons))
@@ -717,20 +734,7 @@ long value"
     (org-set-property ytr-org-author-property-name author)
     (kill-whole-line)  ;; kill line we just opened
     (insert local-content)
-    (when (/= (length attachments) 0)
-      (save-excursion
-        (goto-char start)
-        (org-set-tags (append (org-get-tags) '("YTR_ATTACH")))
-        ))
-    (mapcar (lambda (attachment-alist)
-              (let-alist attachment-alist
-                (replace-string-in-region (format "[[file:%s]]" .name)
-                                          (format "[[%s%s&forceDownload=true&ytr_name=%s][%s]]" ytr-baseurl .url .name .name)
-                                          (point-min) (point-max))
-                (replace-regexp-in-region (format "\\[\\[file:%s]\\[\\(.*\\)]]" .name)
-                                          (format "[[%s%s&forceDownload=true&ytr_name=%s][\\1]]" ytr-baseurl .url .name)
-                                          (point-min) (point-max))))
-            attachments)))
+    ))
 
 (defun ytr-find-node (&optional type-wanted)
   "Find the parent heading with a YTR_NODE_TYPE property.
