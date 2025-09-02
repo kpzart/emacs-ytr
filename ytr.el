@@ -1258,7 +1258,8 @@ Special cases:
         ;; Lösche die Tabelle
         (delete-region (org-table-begin) (org-table-end))
         ;; Neue Tabelle
-        (ytr-query-to-org-table query t properties)))))
+        (ytr-query-to-org-table query t properties)
+        (goto-char my-point)))))
 
 (defun ytr-update-org-query-table-hook ()
   (condition-case nil
