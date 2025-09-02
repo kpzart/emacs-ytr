@@ -1449,16 +1449,16 @@ which receives as argument den issue-alist."
     (car issue-node-cons)))
 
 (defun ytr-copy-issue-node-code-action (issue-node-cons)
-  "Put a string for issue and node code on kill ring."
-  (kill-new (ytr-issue-node-code-action issue-node-cons)))
+  "Put a string for issue and node code on kill ring and print it as message."
+  (let ((issue-node-code (ytr-issue-node-code-action issue-node-cons)))
+    (kill-new issue-node-code)
+    (message issue-node-code)))
 
 (defun ytr-insert-issue-node-code-action (issue-node-cons)
   "Insert a string for issue and node code."
   (insert (ytr-issue-node-code-action issue-node-cons)))
 
-(defun ytr-message-issue-node-code-action (issue-node-cons)
-  "Echo issue and node code in message area."
-  (message (ytr-issue-node-code-action issue-node-cons)))
+(defalias 'ytr-message-issue-node-code-action 'ytr-copy-issue-node-code-action "Put a string for issue and node code on kill ring and print it as message.")
 
 ;;;; Open in browser
 
