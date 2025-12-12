@@ -562,10 +562,10 @@ conversion loss."
         (with-current-buffer input-md-buffer ;; store for diff
           (erase-buffer)
           (insert input))
-        (let ((org-export-show-temporary-export-buffer nil))
-          (org-export-to-buffer 'gfm org-export-gfm-buffer))
-        (with-current-buffer org-export-gfm-buffer (ytr-perform-markdown-replacements ""))
         (when (or ytr-save-import-diff-inline diff-file)
+          (let ((org-export-show-temporary-export-buffer nil))
+            (org-export-to-buffer 'gfm org-export-gfm-buffer))
+          (with-current-buffer org-export-gfm-buffer (ytr-perform-markdown-replacements ""))
           (let ((diff-switches ytr-import-diff-switches))
             (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer ))
           (with-current-buffer diff-md-buffer
