@@ -123,8 +123,8 @@ One of \='kill\=, \='fetch\=, \='keep\= or \='keep-content.\="
 
 ;;;;; marginalia
 
-(add-to-list 'marginalia-annotator-registry '(ytr-issue-code ytr-annotate-issue-code builtin none))
-(add-to-list 'marginalia-annotator-registry '(ytr-query ytr-annotate-query builtin none))
+(add-to-list 'marginalia-annotators '(ytr-issue-code ytr-annotate-issue-code builtin none))
+(add-to-list 'marginalia-annotators '(ytr-query ytr-annotate-query builtin none))
 
 (defun ytr-completing-read-categorised (prompt choices category)
   "Like completing-read but puts a category on the choices."
