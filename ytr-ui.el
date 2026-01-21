@@ -151,7 +151,7 @@ ACTION is the consult action, CAND is the candidate."
                             (concat (alist-get 'idReadable item) ": " (alist-get 'summary item)))
                           ytr-issues-alist)))
     (car (split-string (consult--read choices
-                                      :category 'ytr-issue-code
+                                      :category 'ytr-issue-node-code
                                       :state 'ytr-consult-state-function
                                       :require-match t
                                       :sort nil
