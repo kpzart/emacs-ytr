@@ -134,12 +134,14 @@ Return nil if no heading found."
 
 ;;;; Markdown to Org conversion
 
-(defun ytr-md-to-org (input level &optional diff-file)
+(defun ytr-md-to-org (input level &optional local-diff-switches diff-file force-diff-block)
   "Convert a markdown string INPUT to org mode using pandoc.
 
-LEVEL indicates the level of top level headings in org and defaults to 3.
-If DIFF-FILE is given, a diff file is written, that contains possible
-conversion loss."
+LEVEL indicates the level of top level headings in org and defaults to
+3. If DIFF-FILE is given and a string, a diff file is written, that
+contains possible conversion loss. If it is the symbol inline, the diff
+will be created in a src block inline. If FORCE-DIFF-BLOCK is given, an
+inline diff block will be created even if it is empty."
   (save-excursion
     (let ((input-md-buffer (get-buffer-create "*ytr-input-md*"))
           (pandoc-org-buffer (get-buffer-create "*ytr-pandoc-org*"))
@@ -162,14 +164,14 @@ conversion loss."
         (ytr-demote-org-headings (or level 3))
         (org-unindent-buffer)
         (ytr-align-all-org-tables-in-buffer)
-        (with-current-buffer input-md-buffer ;; store for diff
-          (erase-buffer)
-          (insert input))
-        (when (or ytr-save-import-diff-inline diff-file)
+        (when diff-file
+          (with-current-buffer input-md-buffer ;; store for diff
+            (erase-buffer)
+            (insert input))
           (let ((org-export-show-temporary-export-buffer nil))
             (org-export-to-buffer 'gfm org-export-gfm-buffer))
           (with-current-buffer org-export-gfm-buffer (ytr-perform-markdown-replacements ""))
-          (let ((diff-switches ytr-import-diff-switches))
+          (let ((diff-switches local-diff-switches))
             (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer ))
           (with-current-buffer diff-md-buffer
             (let ((inhibit-read-only t))
@@ -179,13 +181,13 @@ conversion loss."
               (delete-line)
               (goto-char (- (point-max) 1))
               (delete-line)))
-          (when diff-file
+          (when (stringp diff-file)
             (with-current-buffer diff-md-buffer
               (write-region (point-min) (point-max) diff-file)))
           (let ((diff (with-current-buffer diff-md-buffer (buffer-string))))
-            (when (and ytr-save-import-diff-inline
+            (when (and (eq diff-file 'inline)
                        (or (not (string= "" diff))
-                           ytr-save-import-diff-inline-when-empty))
+                           force-diff-block))
               (save-excursion
                 (goto-char (point-min))
                 (insert "#+name: ytr_import_diff\n")
@@ -227,7 +229,11 @@ DELETED is t if the node is deleted."
          (type-string (format "%s" type))
          (remote-content (or content ""))
          (local-content (ytr-trim-blank-lines-leading-and-trailing
-                         (ytr-org-perform-attachment-replacements-import (ytr-md-to-org remote-content (+ 1 level))
+                         (ytr-org-perform-attachment-replacements-import (ytr-md-to-org remote-content
+                                                                                        (+ 1 level)
+                                                                                        ytr-import-diff-switches
+                                                                                        (when ytr-save-import-diff-inline 'inline)
+                                                                                        ytr-save-import-diff-inline-when-empty)
                                                                          attachments))))
     (open-line 1)  ;; need this to ensure props go to correct heading
     (insert (format "%s %s by %s\n\n"
@@ -383,8 +389,10 @@ Special cases:
 ;;;; Hash comparison functions
 
 (defun ytr-node-locally-edited-p (&optional false_if_no_node)
-  "Return whether the hash of the current subtree differs from the local hash in property.
-If FALSE_IF_NO_NODE is non-nil, return nil instead of error when no node found."
+  "Return whether the hash of the current subtree differs from the local
+hash in property.
+If FALSE_IF_NO_NODE is non-nil, return nil instead of error when no node
+found."
   (save-mark-and-excursion
     (if (not (member (ytr-find-node) (list 'comment 'description)))
         (when (not false_if_no_node)
@@ -396,9 +404,11 @@ If FALSE_IF_NO_NODE is non-nil, return nil instead of error when no node found."
         (not (string= saved-local-hash actual-local-hash))))))
 
 (defun ytr-node-remotely-edited-p (&optional remote-content false_if_no_node)
-  "Return whether the hash of REMOTE-CONTENT differs from the remote hash in property.
-If REMOTE-CONTENT is nil it will be retrieved according to point (only works for comments!).
-If FALSE_IF_NO_NODE is non-nil, return nil instead of error when no node found."
+  "Return whether the hash of REMOTE-CONTENT differs from the remote hash
+in property.
+If REMOTE-CONTENT is nil it will be retrieved according to point (only
+works for comments!). If FALSE_IF_NO_NODE is non-nil, return nil instead
+of error when no node found."
   (unless remote-content
     (setq remote-content (alist-get 'text (ytr-retrieve-issue-comment-alist (ytr-guess-issue-node-cons)))))
   (save-mark-and-excursion
