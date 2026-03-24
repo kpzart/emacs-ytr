@@ -466,9 +466,8 @@ ATTACH-DIR is the org attachment directory."
           (keep (deactivate-mark))
           (keep-content
            (let-alist (ytr-retrieve-issue-comment-alist (cons issue-code new-node-code))
+             (replace-regexp-in-region "^\\(\\*+ \\)" "*\\1" (point) (mark))
              (deactivate-mark)
-             (when (looking-at-p "\*+ ")
-               (insert "*"))
              (goto-char position)
              (ytr-org-insert-node nil curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments .deleted)
              (setq local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing (buffer-substring-no-properties (point) (org-end-of-subtree)))))
