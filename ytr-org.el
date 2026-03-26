@@ -895,6 +895,7 @@ that are no ytr nodes."
                   (goto-char current-point) ; for some reason save-excursion does not work reliably here (maybe because buffer shrinks)
                   ))))
           (goto-char end)
+          (insert "\n\n")
           (mapcar (lambda (comment-alist)
                     (let-alist comment-alist
                       (ytr-org-insert-node .text (+ 1 level) 'comment (cons issue-code .id) (alist-get 'fullName .author) .created .updated .attachments .deleted)))
