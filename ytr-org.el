@@ -667,7 +667,8 @@ If TRUST-HASH is non-nil, skip fetching if hashes match."
            (issue-node-cons (ytr-issue-node-cons-from-org-property))
            (issue-code (car issue-node-cons))
            (node-code (cdr issue-node-cons))
-           (curlevel (org-current-level)))
+           (curlevel (org-current-level))
+           (tags (org-get-tags)))
       (when (or (not (ytr-node-locally-edited-p t))
                 (and (y-or-n-p (format "Node %s was edited locally! Fetch anyway?" (ytr-issue-node-code-action issue-node-cons)))
                      (or (setq trust-hash nil) t))) ; in this case, fetch even when remote hash is current, in order to restore remote content
@@ -691,7 +692,8 @@ If TRUST-HASH is non-nil, skip fetching if hashes match."
                              (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments nil)))
               (comment (let-alist node-alist
                          (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments .deleted)))
-              (issue (ytr-insert-issue-alist-as-org node-alist curlevel))
+              (issue (save-excursion (ytr-insert-issue-alist-as-org node-alist curlevel))
+                     (org-set-tags tags))
               (t (user-error "Bad node type %s" node-type)))))))))
 
 ;;;; Org actions
