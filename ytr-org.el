@@ -668,7 +668,7 @@ If TRUST-HASH is non-nil, skip fetching if hashes match."
            (issue-code (car issue-node-cons))
            (node-code (cdr issue-node-cons))
            (curlevel (org-current-level))
-           (tags (org-get-tags)))
+           (tags (org-get-tags nil t)))
       (when (or (not (ytr-node-locally-edited-p t))
                 (and (y-or-n-p (format "Node %s was edited locally! Fetch anyway?" (ytr-issue-node-code-action issue-node-cons)))
                      (or (setq trust-hash nil) t))) ; in this case, fetch even when remote hash is current, in order to restore remote content
