@@ -436,6 +436,19 @@ of error when no node found."
     (set-window-configuration ytr-buffer-wconf)
     (kill-buffer buffer)))
 
+(defun ytr-convert-list-items-to-ytr-md (beg end max-depth)
+  (interactive "r\nnMax depth: ")
+  (let ((end-marker (copy-marker end))
+        (regexp (format "^\\(\\(?:    \\)\\{0,%d\\}\\)-   " max-depth)))
+    (save-excursion
+      (goto-char beg)
+      (while (re-search-forward regexp end-marker t)
+        (let* ((indent (match-string 1))
+               (depth (/ (length indent) 4))
+               (new-indent (make-string (* 2 depth) ?\s)))
+          (replace-match (concat new-indent "* ") t t))))
+    (set-marker end-marker nil)))
+
 (defun ytr-perform-markdown-replacements (attach-dir)
   "Perform markdown replacements for export.
 ATTACH-DIR is the org attachment directory."
@@ -448,6 +461,8 @@ ATTACH-DIR is the org attachment directory."
   (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
   (replace-regexp-in-region ":.*:$" "" (point-min) (point-max))
   (replace-string-in-region "\n\n\n" "\n\n" (point-min) (point-max))
+  (ytr-convert-list-items-to-ytr-md (point-min) (point-max) 7)
+  (replace-string-in-region "* [X] " "* [x] " (point-min) (point-max))
   (whitespace-cleanup))
 
 (defun ytr-commit-new-comment ()
