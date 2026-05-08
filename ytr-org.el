@@ -44,7 +44,7 @@
 
 ;;;; Forward declarations
 (declare-function ytr-issue-node-code-action "ytr")
-(declare-function ytr-parse-issue-node-code "ytr")
+(declare-function ytr-to-issue-node-cons "ytr")
 (declare-function ytr-guess-or-read-issue-code "ytr")
 (declare-function ytr-guess-issue-node-cons "ytr")
 (declare-function ytr-add-issue-to-history "ytr")
@@ -898,7 +898,7 @@ that are no ytr nodes."
                   (condition-case err
                       (ytr-fetch-remote-node (cl-case (intern node-type)
                                                (description issue-alist)
-                                               (comment (setq node-code (cdr (ytr-parse-issue-node-code issue-node-code)))
+                                               (comment (setq node-code (cdr (ytr-to-issue-node-cons issue-node-code)))
                                                         (push node-code processed-node-codes)
                                                         (or (cl-find-if (lambda (comment-alist)
                                                                           (string= (alist-get 'id comment-alist) node-code))

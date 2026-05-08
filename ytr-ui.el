@@ -46,7 +46,7 @@
 (defvar ytr-issue-node-code-pattern)
 
 ;;;; Forward declarations for functions defined in other modules
-(declare-function ytr-parse-issue-node-code "ytr")
+(declare-function ytr-to-issue-node-cons "ytr")
 (declare-function ytr-delim-pattern "ytr")
 (declare-function ytr-add-issue-to-history "ytr")
 (declare-function ytr-issue-node-code-action "ytr")
@@ -350,7 +350,7 @@ ISSUE-NODE-CONS is a cons cell (issue-code . node-code)."
 
 (defun ytr-on-issue-node-code-button (button)
   "Handle click on issue BUTTON."
-  (let ((issue-node-cons (ytr-parse-issue-node-code (buffer-substring (button-start button) (button-end button)))))
+  (let ((issue-node-cons (ytr-to-issue-node-cons (buffer-substring (button-start button) (button-end button)))))
     (ytr-dart-browse issue-node-cons)))
 
 (defun ytr-issue-node-code-buttonize-buffer ()

@@ -92,6 +92,22 @@ One of `kill', `fetch', `keep' or `keep-content'."
   :type 'function :group 'ytr
   :options '(ytr-read-issue-code-basic ytr-read-issue-code-annotated ytr-read-issue-code-consult))
 
+(defcustom ytr-guess-issue-node-cons-functions
+  '(ytr-issue-node-cons-from-point
+    ytr-issue-node-cons-from-line
+    ytr-issue-node-cons-from-org-property
+    ytr-issue-node-cons-from-local-variable)
+  "Functions used by `ytr-guess-issue-code' to guess an issue code.
+
+Each function is called with no arguments and should return an issue code
+string, or nil if it cannot guess one.  Functions are tried in order."
+  :type '(repeat function)
+  :group 'ytr)
+
+;;;; Local Variables
+
+(defvar-local ytr-local-issue-node-code nil "Set issue node code locally")
+
 ;;;; History and state variables
 
 (defvar ytr-issue-history '() "History for issues.")
@@ -148,33 +164,21 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
 
 (add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9a-zA-Z#-" "" ""))
 
-(defun ytr-parse-issue-node-code (candidate)
-  "Parse CANDIDATE string for an issue and a node code if present.
+(defun ytr-to-issue-node-cons (issue-node-code)
+  "Parse ISSUE-NODE-CODE string for an issue and a node code if present.
 Return a cons (issue-code . node-code)."
-  (if (string-match (ytr-delim-pattern ytr-issue-node-code-pattern) candidate)
-      (cons (match-string 1 candidate) (match-string 2 candidate))
+  (if (and issue-node-code (string-match (ytr-delim-pattern ytr-issue-node-code-pattern) issue-node-code))
+      (cons (match-string 1 issue-node-code) (match-string 2 issue-node-code))
     nil))
 
 (defun ytr-issue-node-code-from-point ()
   "Return the issue-node-code or issue-code at point or nil if there is none."
-  (ytr-parse-issue-node-code (ffap-string-at-point 'ytr)))
+  (ffap-string-at-point 'ytr))
 
-(defun ytr-issue-code-from-point ()
-  "Return the issue code at point or nil if there is none."
-  (car (ytr-issue-node-code-from-point)))
-
-(defun ytr-issue-node-cons-from-org-property ()
+(defun ytr-issue-node-code-from-org-property ()
   "Return the issue code defined by an org property YTR_ISSUE_CODE or nil."
-  (if (derived-mode-p 'org-mode)
-      (let ((issue-code (org-entry-get (point) ytr-org-issue-code-property-name t)))
-        (when issue-code (ytr-parse-issue-node-code issue-code)))
-    nil))
-
-(defun ytr-issue-code-from-branch ()
-  "Return the issue code from the name of the current git branch."
-  (let ((branch-name (shell-command-to-string "git rev-parse --abbrev-ref HEAD")))
-    (if (string-match (format "^\\([a-zA-Z]+/\\)?\\(%s\\)[-_].*$" ytr-issue-code-pattern) branch-name)
-        (match-string 2 branch-name))))
+  (when (derived-mode-p 'org-mode)
+    (org-entry-get (point) ytr-org-issue-code-property-name t)))
 
 (defun ytr-issue-node-code-from-line ()
   "Return the first issue code in current line."
@@ -183,36 +187,36 @@ Return a cons (issue-code . node-code)."
         (match-string 0 line)
       nil)))
 
-(defun ytr-issue-node-cons-from-line ()
-  "Return issue-node cons from current line."
-  (let ((code (ytr-issue-node-code-from-line)))
-    (when code (ytr-parse-issue-node-code code))))
-
 ;;;; Guessing functions
 
-(defun ytr-guess-issue-code ()
-  "Return an issue code from current context."
-  (interactive)
-  (let ((issue-code (ytr-issue-code-from-point)))
-    (if issue-code issue-code
-      (let ((issue-code (car (ytr-issue-node-cons-from-line))))
-        (if issue-code issue-code
-          (let ((issue-node-cons (ytr-issue-node-cons-from-org-property)))
-            (if issue-node-cons (car issue-node-cons)
-              (let ((issue-code (ytr-issue-code-from-branch)))
-                (if issue-code issue-code nil)))))))))
+(defun ytr-issue-node-cons-from-point ()
+  "Return the issue-node-code or issue-code at point or nil if there is none."
+  (ytr-to-issue-node-cons (ytr-issue-node-code-from-point)))
+
+(defun ytr-issue-node-cons-from-org-property ()
+  "Return the issue node cons defined by an org property YTR_ISSUE_CODE or nil."
+  (ytr-to-issue-node-cons (ytr-issue-node-code-from-org-property)))
+
+(defun ytr-issue-node-cons-from-line ()
+  "Return issue-node cons from current line."
+  (ytr-to-issue-node-cons (ytr-issue-node-code-from-line)))
+
+(defun ytr-issue-node-cons-from-local-variable ()
+  "Return issue-node cons from local variable"
+  (ytr-to-issue-node-cons ytr-local-issue-node-code))
 
 (defun ytr-guess-issue-node-cons ()
-  "Return a cons cell from issue code and node code from current context."
+  "Return an issue code from current context.
+
+Guessing is done by calling `ytr-guess-issue-code-functions' in order and
+returning the first non-nil result."
   (interactive)
-  (let ((issue-node-cons (ytr-issue-node-code-from-point)))
-    (if issue-node-cons issue-node-cons
-      (let ((issue-node-cons (ytr-issue-node-cons-from-line)))
-        (if issue-node-cons issue-node-cons
-          (let ((issue-node-cons (ytr-issue-node-cons-from-org-property)))
-            (if issue-node-cons issue-node-cons
-              (let ((issue-code (ytr-issue-code-from-branch)))
-                (if issue-code (cons issue-code nil) nil)))))))))
+  (catch 'issue-node-cons
+    (dolist (fn ytr-guess-issue-node-cons-functions)
+      (let ((issue-node-cons (funcall fn)))
+        (when issue-node-cons
+          (throw 'issue-node-cons issue-node-cons))))
+    nil))
 
 (defun ytr-guess-or-read-issue-code ()
   "Guess issue code from context or start a query."
@@ -312,14 +316,14 @@ Dart form uses simple prompt for issue-node-code."
   `(defun ,(intern (format "ytr-dart-%s" name)) (issue-node-code)
      ,(format "Dart form of %s." name)
      (interactive "sIssue Code (may also have Node Code): ")
-     (funcall ,action (ytr-parse-issue-node-code issue-node-code))))
+     (funcall ,action (ytr-to-issue-node-cons issue-node-code))))
 
 (defmacro ytr-define-embark-action (name action)
   "Define an embark form action NAME that calls ACTION.
 Embark form extracts issue code from candidate."
   `(defun ,(intern (format "ytr-embark-%s" name)) (cand)
      ,(format "Embark form of %s." name)
-     (funcall ,action (ytr-parse-issue-node-code (car (split-string cand ":"))))))
+     (funcall ,action (ytr-to-issue-node-cons (car (split-string cand ":"))))))
 
 (defmacro ytr-define-base-action (name action)
   "Define a base form action NAME that calls ACTION.
