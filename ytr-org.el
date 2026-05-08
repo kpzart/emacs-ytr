@@ -156,6 +156,8 @@ inline diff block will be created even if it is empty."
         (let ((inhibit-message t))
           (replace-string-in-region "☒" "[X]" (point-min) (point-max))
           (replace-string-in-region "☐" "[ ]" (point-min) (point-max)))
+        (flush-lines "^#\\+begin_html$" (point-min) (point-max))
+        (flush-lines "^#\\+end_html$" (point-min) (point-max))
         (goto-char (point-min))
         (flush-lines " *:[A-Z_]+:.*$") ; remove properties
         (goto-char (point-max))
@@ -229,12 +231,13 @@ DELETED is t if the node is deleted."
          (type-string (format "%s" type))
          (remote-content (or content ""))
          (local-content (ytr-trim-blank-lines-leading-and-trailing
-                         (ytr-org-perform-attachment-replacements-import (ytr-md-to-org remote-content
-                                                                                        (+ 1 level)
-                                                                                        ytr-import-diff-switches
-                                                                                        (when ytr-save-import-diff-inline 'inline)
-                                                                                        ytr-save-import-diff-inline-when-empty)
-                                                                         attachments))))
+                         (ytr-org-perform-attachment-replacements-import
+                          (ytr-md-to-org remote-content
+                                         (+ 1 level)
+                                         ytr-import-diff-switches
+                                         (when ytr-save-import-diff-inline 'inline)
+                                         ytr-save-import-diff-inline-when-empty)
+                          attachments))))
     (open-line 1)  ;; need this to ensure props go to correct heading
     (insert (format "%s %s by %s\n\n"
                     (make-string level ?*)
