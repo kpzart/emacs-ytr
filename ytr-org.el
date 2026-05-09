@@ -225,18 +225,19 @@ list of remote issue attachment alists used to rewrite imported file links."
 (defun ytr-org-perform-attachment-replacements-import-in-buffer (attachments)
   "Replace links in the current buffer to ATTACHMENTS found at the remote issue."
   (save-excursion
-    (dolist (attachment-alist attachments)
-      (let-alist attachment-alist
-        (let* ((name .name)
-               (quoted-name (regexp-quote name))
-               (replacement-link (format "%s%s&forceDownload=true&ytr_name=%s"
-                                         ytr-baseurl .url name)))
-          (goto-char (point-min))
-          (while (re-search-forward (format "\\[\\[file:%s\\]\\]" quoted-name) nil t)
-            (replace-match (format "[[%s][%s]]" replacement-link name) t t))
-          (goto-char (point-min))
-          (while (re-search-forward (format "\\[\\[file:%s\\]\\[\\([^]\n]*\\)\\]\\]" quoted-name) nil t)
-            (replace-match (format "[[%s][%s]]" replacement-link (match-string 1)) t t)))))))
+    (mapc (lambda (attachment-alist)
+            (let-alist attachment-alist
+              (let* ((name .name)
+                     (quoted-name (regexp-quote name))
+                     (replacement-link (format "%s%s&forceDownload=true&ytr_name=%s"
+                                               ytr-baseurl .url name)))
+                (goto-char (point-min))
+                (while (re-search-forward (format "\\[\\[file:%s\\]\\]" quoted-name) nil t)
+                  (replace-match (format "[[%s][%s]]" replacement-link name) t t))
+                (goto-char (point-min))
+                (while (re-search-forward (format "\\[\\[file:%s\\]\\[\\([^]\n]*\\)\\]\\]" quoted-name) nil t)
+                  (replace-match (format "[[%s][%s]]" replacement-link (match-string 1)) t t)))))
+          attachments)))
 
 (defun ytr-org-perform-attachment-replacements-import (org-content attachments)
   "Replace links in ORG-CONTENT to ATTACHMENTS found at the remote issue.
