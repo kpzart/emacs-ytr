@@ -236,6 +236,16 @@ list of remote issue attachment alists used to rewrite imported file links."
                   (replace-match (format "[[%s][%s]]" replacement-link name) t t))
                 (goto-char (point-min))
                 (while (re-search-forward (format "\\[\\[file:%s\\]\\[\\([^]\n]*\\)\\]\\]" quoted-name) nil t)
+                  (replace-match (format "[[%s][%s]]" replacement-link (match-string 1)) t t))
+                (goto-char (point-min))
+                (while (re-search-forward (format "!\\[\\([^]\n]*\\)\\](%s)" quoted-name) nil t)
+                  (let ((description (match-string 1)))
+                    (replace-match (format "[[%s][%s]]"
+                                           replacement-link
+                                           (if (string= description "") name description))
+                                   t t)))
+                (goto-char (point-min))
+                (while (re-search-forward (format "\\[\\([^]\n]*\\)\\](%s)" quoted-name) nil t)
                   (replace-match (format "[[%s][%s]]" replacement-link (match-string 1)) t t)))))
           attachments)))
 
