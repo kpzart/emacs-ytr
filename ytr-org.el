@@ -70,6 +70,10 @@
 (defcustom ytr-save-import-diff-inline-when-empty nil "Control whether an inline code block is written even if the diff is empty." :type 'boolean :group 'ytr)
 (defcustom ytr-import-diff-switches "--ignore-space-change" "Diff Switches used to create the import diff." :type 'string :group 'ytr)
 (defcustom ytr-org-file "~/ytr.org" "File path used for persisting downloaded issues." :type 'file :group 'ytr)
+(defcustom ytr-org-enable-attachment-replacements nil
+  "Whether ytr-org rewrites attachment links during import and export."
+  :type 'boolean
+  :group 'ytr)
 
 ;;;; Buffer-local variables
 (defvar-local ytr-buffer-position nil "Buffer local var to store position.")
@@ -180,7 +184,7 @@ list of remote issue attachment alists used to rewrite imported file links."
         (ytr-demote-org-headings (or level 3))
         (org-unindent-buffer)
         (ytr-align-all-org-tables-in-buffer)
-        (when attachments
+        (when (and ytr-org-enable-attachment-replacements attachments)
           (ytr-org-perform-attachment-replacements-import-in-buffer attachments))
         (ytr-trim-blank-lines-leading-and-trailing-in-buffer)
         (when diff-file
@@ -481,12 +485,14 @@ of error when no node found."
   "Perform markdown replacements for export.
 ATTACH-DIR is the org attachment directory."
   (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
-  (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\(?:png\\|jpeg\\|jpg\\)\\))" ytr-baseurl) "![](\\1)" (point-min) (point-max))
-  (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "[\\1](\\2)" (point-min) (point-max))
+  (when ytr-org-enable-attachment-replacements
+    (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\(?:png\\|jpeg\\|jpg\\)\\))" ytr-baseurl) "![](\\1)" (point-min) (point-max))
+    (replace-regexp-in-region (format "\\[\\(.*\\)\\](%s.*&ytr_name=\\(.*\\))" ytr-baseurl) "[\\1](\\2)" (point-min) (point-max)))
   (replace-regexp-in-region (format "\\([^[#a-zA-Z0-9-]\\|^\\)%s\\([^]#a-zA-Z0-9-]\\|$\\)" ytr-issue-mandatory-node-code-pattern)
                             (format "\\1[\\2#\\3](%s/issue/\\2#focus=Comments-\\3.0-0)\\4" ytr-baseurl) (point-min) (point-max))
-  (replace-regexp-in-region (format "](file://%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
-  (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
+  (when ytr-org-enable-attachment-replacements
+    (replace-regexp-in-region (format "](file://%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max))
+    (replace-regexp-in-region (format "](%s/\\(.*\\))" (expand-file-name attach-dir)) "](\\1)" (point-min) (point-max)))
   (replace-regexp-in-region ":.*:$" "" (point-min) (point-max))
   (replace-string-in-region "\n\n\n" "\n\n" (point-min) (point-max))
   (ytr-convert-list-items-to-ytr-md (point-min) (point-max) 7)
