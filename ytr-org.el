@@ -185,7 +185,7 @@ list of remote issue attachment alists used to rewrite imported file links."
         (org-unindent-buffer)
         (ytr-align-all-org-tables-in-buffer)
         (when (and ytr-org-enable-attachment-replacements attachments)
-          (ytr-org-perform-attachment-replacements-import-in-buffer attachments))
+          (ytr-org-perform-import-to-org-attachment-replacements attachments))
         (ytr-trim-blank-lines-leading-and-trailing-in-buffer)
         (when diff-file
           (with-current-buffer input-md-buffer ;; store for diff
@@ -193,7 +193,7 @@ list of remote issue attachment alists used to rewrite imported file links."
             (insert input))
           (let ((org-export-show-temporary-export-buffer nil))
             (org-export-to-buffer 'gfm org-export-gfm-buffer))
-          (with-current-buffer org-export-gfm-buffer (ytr-perform-markdown-replacements ""))
+          (with-current-buffer org-export-gfm-buffer (ytr-org-perform-export-to-markdown-replacements ""))
           (let ((diff-switches local-diff-switches))
             (diff-no-select input-md-buffer org-export-gfm-buffer nil 'no-async diff-md-buffer ))
           (with-current-buffer diff-md-buffer
@@ -222,7 +222,7 @@ list of remote issue attachment alists used to rewrite imported file links."
 
 ;;;; Org insertion functions
 
-(defun ytr-org-perform-attachment-replacements-import-in-buffer (attachments)
+(defun ytr-org-perform-import-to-org-attachment-replacements (attachments)
   "Replace links in the current buffer to ATTACHMENTS found at the remote issue."
   (save-excursion
     (mapc (lambda (attachment-alist)
@@ -248,14 +248,6 @@ list of remote issue attachment alists used to rewrite imported file links."
                 (while (re-search-forward (format "\\[\\([^]\n]*\\)\\](%s)" quoted-name) nil t)
                   (replace-match (format "[[%s][%s]]" replacement-link (match-string 1)) t t)))))
           attachments)))
-
-(defun ytr-org-perform-attachment-replacements-import (org-content attachments)
-  "Replace links in ORG-CONTENT to ATTACHMENTS found at the remote issue.
-Returns the resulting content."
-  (with-temp-buffer
-    (insert org-content)
-    (ytr-org-perform-attachment-replacements-import-in-buffer attachments)
-    (buffer-substring-no-properties (point-min) (point-max))))
 
 (defun ytr-org-insert-node (content level type issue-node-cons author created updated attachments deleted)
   "Insert a node at point.
@@ -492,7 +484,7 @@ of error when no node found."
           (replace-match (concat new-indent "* ") t t))))
     (set-marker end-marker nil)))
 
-(defun ytr-perform-markdown-replacements (attach-dir)
+(defun ytr-org-perform-export-to-markdown-replacements (attach-dir)
   "Perform markdown replacements for export.
 ATTACH-DIR is the org attachment directory."
   (replace-regexp-in-region "^#" (make-string ytr-export-base-heading-level ?#) (point-min) (point-max))
@@ -607,7 +599,7 @@ ATTACH-DIR is the org attachment directory."
           (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
           (attach-dir (or (org-attach-dir) "")))
       (org-gfm-export-as-markdown nil nil)
-      (ytr-perform-markdown-replacements attach-dir)
+      (ytr-org-perform-export-to-markdown-replacements attach-dir)
       (ytr-commit-new-comment-mode)
       (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-code)
       (setq-local ytr-buffer-position position
@@ -672,7 +664,7 @@ ATTACH-DIR is the org attachment directory."
       (kill-whole-line)
       (save-window-excursion
         (org-gfm-export-as-markdown nil nil)
-        (ytr-perform-markdown-replacements "")
+        (ytr-org-perform-export-to-markdown-replacements "")
         (whitespace-cleanup)
         (ytr-browse-new-issue title (buffer-string))))
     (insert heading)
@@ -699,7 +691,7 @@ ATTACH-DIR is the org attachment directory."
     (when (not (string= import-remote-hash current-remote-hash))
       (user-error "Aborted! Remote Node was edited since last fetch: %s, %s" import-remote-hash current-remote-hash))
     (org-gfm-export-as-markdown nil t)
-    (ytr-perform-markdown-replacements attach-dir)
+    (ytr-org-perform-export-to-markdown-replacements attach-dir)
     (ytr-commit-update-node-mode)
     (message "Update %s%s on issue %s" type (if (eq type 'comment) (format " with ID %s" node-code) "") issue-code)
     (setq-local ytr-buffer-position position
