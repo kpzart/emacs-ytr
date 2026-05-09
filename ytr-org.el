@@ -94,9 +94,22 @@ Calls `org-table-align' once per table. Preserves point."
       (org-table-align)
       (goto-char (org-table-end)))))
 
+(defun ytr-trim-blank-lines-leading-and-trailing-in-buffer ()
+  "Trim blank lines at the beginning and end of the current buffer."
+  (save-excursion
+    (goto-char (point-min))
+    (delete-region (point) (progn (skip-chars-forward " \t\r\n") (point)))
+    (goto-char (point-max))
+    (let ((end (point)))
+      (skip-chars-backward " \t\r\n")
+      (delete-region (point) end))))
+
 (defun ytr-trim-blank-lines-leading-and-trailing (content)
   "Return CONTENT with all blank lines at the beginning and end trimmed."
-  (replace-regexp-in-string "\n*[ \t\r\n]*\\'" "" (replace-regexp-in-string "\\`[ \t\r\n]*\n*" "" content)))
+  (with-temp-buffer
+    (insert content)
+    (ytr-trim-blank-lines-leading-and-trailing-in-buffer)
+    (buffer-substring-no-properties (point-min) (point-max))))
 
 (defun ytr-max-heading-level ()
   "Determine the highest Heading in the buffer.
@@ -134,14 +147,15 @@ Return nil if no heading found."
 
 ;;;; Markdown to Org conversion
 
-(defun ytr-md-to-org (input level &optional local-diff-switches diff-file force-diff-block)
+(defun ytr-md-to-org (input level &optional local-diff-switches diff-file force-diff-block attachments)
   "Convert a markdown string INPUT to org mode using pandoc.
 
 LEVEL indicates the level of top level headings in org and defaults to
 3. If DIFF-FILE is given and a string, a diff file is written, that
 contains possible conversion loss. If it is the symbol inline, the diff
 will be created in a src block inline. If FORCE-DIFF-BLOCK is given, an
-inline diff block will be created even if it is empty."
+inline diff block will be created even if it is empty. ATTACHMENTS is a
+list of remote issue attachment alists used to rewrite imported file links."
   (save-excursion
     (let ((input-md-buffer (get-buffer-create "*ytr-input-md*"))
           (pandoc-org-buffer (get-buffer-create "*ytr-pandoc-org*"))
@@ -166,6 +180,9 @@ inline diff block will be created even if it is empty."
         (ytr-demote-org-headings (or level 3))
         (org-unindent-buffer)
         (ytr-align-all-org-tables-in-buffer)
+        (when attachments
+          (ytr-org-perform-attachment-replacements-import-in-buffer attachments))
+        (ytr-trim-blank-lines-leading-and-trailing-in-buffer)
         (when diff-file
           (with-current-buffer input-md-buffer ;; store for diff
             (erase-buffer)
@@ -201,19 +218,29 @@ inline diff block will be created even if it is empty."
 
 ;;;; Org insertion functions
 
+(defun ytr-org-perform-attachment-replacements-import-in-buffer (attachments)
+  "Replace links in the current buffer to ATTACHMENTS found at the remote issue."
+  (save-excursion
+    (dolist (attachment-alist attachments)
+      (let-alist attachment-alist
+        (let* ((name .name)
+               (quoted-name (regexp-quote name))
+               (replacement-link (format "%s%s&forceDownload=true&ytr_name=%s"
+                                         ytr-baseurl .url name)))
+          (goto-char (point-min))
+          (while (re-search-forward (format "\\[\\[file:%s\\]\\]" quoted-name) nil t)
+            (replace-match (format "[[%s][%s]]" replacement-link name) t t))
+          (goto-char (point-min))
+          (while (re-search-forward (format "\\[\\[file:%s\\]\\[\\([^]\n]*\\)\\]\\]" quoted-name) nil t)
+            (replace-match (format "[[%s][%s]]" replacement-link (match-string 1)) t t)))))))
+
 (defun ytr-org-perform-attachment-replacements-import (org-content attachments)
   "Replace links in ORG-CONTENT to ATTACHMENTS found at the remote issue.
 Returns the resulting content."
-  (mapc (lambda (attachment-alist)
-          (let-alist attachment-alist
-            (setq org-content (string-replace (format "[[file:%s]]" .name)
-                                              (format "[[%s%s&forceDownload=true&ytr_name=%s][%s]]" ytr-baseurl .url .name .name)
-                                              org-content))
-            (setq org-content (string-replace (format "\\[\\[file:%s]\\[\\(.*\\)]]" .name)
-                                              (format "[[%s%s&forceDownload=true&ytr_name=%s][\\1]]" ytr-baseurl .url .name)
-                                              org-content))))
-        attachments)
-  org-content)
+  (with-temp-buffer
+    (insert org-content)
+    (ytr-org-perform-attachment-replacements-import-in-buffer attachments)
+    (buffer-substring-no-properties (point-min) (point-max))))
 
 (defun ytr-org-insert-node (content level type issue-node-cons author created updated attachments deleted)
   "Insert a node at point.
@@ -230,14 +257,12 @@ DELETED is t if the node is deleted."
   (let* ((start (point))
          (type-string (format "%s" type))
          (remote-content (or content ""))
-         (local-content (ytr-trim-blank-lines-leading-and-trailing
-                         (ytr-org-perform-attachment-replacements-import
-                          (ytr-md-to-org remote-content
-                                         (+ 1 level)
-                                         ytr-import-diff-switches
-                                         (when ytr-save-import-diff-inline 'inline)
-                                         ytr-save-import-diff-inline-when-empty)
-                          attachments))))
+         (local-content (ytr-md-to-org remote-content
+                                       (+ 1 level)
+                                       ytr-import-diff-switches
+                                       (when ytr-save-import-diff-inline 'inline)
+                                       ytr-save-import-diff-inline-when-empty
+                                       attachments)))
     (open-line 1)  ;; need this to ensure props go to correct heading
     (insert (format "%s %s by %s\n\n"
                     (make-string level ?*)
