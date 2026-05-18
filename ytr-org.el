@@ -45,7 +45,7 @@
 ;;;; Forward declarations
 (declare-function ytr-issue-node-code-action "ytr")
 (declare-function ytr-to-issue-node-cons "ytr")
-(declare-function ytr-guess-or-read-issue-code "ytr")
+(declare-function ytr-guess-or-read-issue-node-cons "ytr")
 (declare-function ytr-guess-issue-node-cons "ytr")
 (declare-function ytr-add-issue-to-history "ytr")
 (declare-function ytr-issue-node-cons-from-org-property "ytr")
@@ -595,7 +595,7 @@ ATTACH-DIR is the org attachment directory."
     (let ((position (point))
           (text (buffer-substring-no-properties (region-beginning) (region-end)))
           (wconf (current-window-configuration))
-          (issue-code (ytr-guess-or-read-issue-code))
+          (issue-code (car (ytr-guess-or-read-issue-node-cons)))
           (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
           (attach-dir (or (org-attach-dir) "")))
       (org-gfm-export-as-markdown nil nil)
