@@ -69,7 +69,10 @@
 (defcustom ytr-save-import-diff-inline nil "Control whether an inline code block is written to each imported node." :type 'boolean :group 'ytr)
 (defcustom ytr-save-import-diff-inline-when-empty nil "Control whether an inline code block is written even if the diff is empty." :type 'boolean :group 'ytr)
 (defcustom ytr-import-diff-switches "--ignore-space-change" "Diff Switches used to create the import diff." :type 'string :group 'ytr)
-(defcustom ytr-org-file "~/ytr.org" "File path used for persisting downloaded issues." :type 'file :group 'ytr)
+(defcustom ytr-org-files '("~/ytr.org")
+  "List of file paths used for persisting downloaded issues."
+  :type '(repeat file)
+  :group 'ytr)
 (defcustom ytr-org-enable-attachment-replacements nil
   "Whether ytr-org rewrites attachment links during import and export."
   :type 'boolean
@@ -802,20 +805,27 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
         (message "Canceled by user.")))))
 
 (defun ytr-find-org-node-action (issue-node-cons)
-  "Find the first node with ISSUE-NODE-CONS in ytr org file."
-  (with-current-buffer (find-file-noselect ytr-org-file)
-    (let ((initial-point (point))
-          (regexp (format "^[   ]*:%s:[   ]*%s$" ytr-org-issue-code-property-name (ytr-issue-node-code-action issue-node-cons))))
-      (goto-char (point-min))
-      (if (re-search-forward regexp nil t)
-          (progn
-            (goto-char (match-beginning 0))
-            (org-back-to-heading)
-            (switch-to-buffer (current-buffer)))
-        (goto-char initial-point)
-        (when (and (not (string= "" ytr-capture-key))
-                   (y-or-n-p "Issue Code not found. Call Capture?"))
-          (ytr-capture-action issue-node-cons))))))
+  "Find the first node with ISSUE-NODE-CONS in `ytr-org-files'."
+  (let ((regexp (format "^[   ]*:%s:[   ]*%s$"
+                        ytr-org-issue-code-property-name
+                        (ytr-issue-node-code-action issue-node-cons)))
+        found)
+    (dolist (file ytr-org-files)
+      (unless found
+        (with-current-buffer (find-file-noselect file)
+          (let ((initial-point (point)))
+            (goto-char (point-min))
+            (if (re-search-forward regexp nil t)
+                (progn
+                  (goto-char (match-beginning 0))
+                  (org-back-to-heading)
+                  (setq found (current-buffer)))
+              (goto-char initial-point))))))
+    (if found
+        (switch-to-buffer found)
+      (when (and (not (string= "" ytr-capture-key))
+                 (y-or-n-p "Issue Code not found. Call Capture?"))
+        (ytr-capture-action issue-node-cons)))))
 
 ;;;; Query to org table
 

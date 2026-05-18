@@ -6,6 +6,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'cl-lib)
 (require 'ytr-org)
 
 (defvar ytr-baseurl nil
@@ -117,6 +118,34 @@ DESCRIPTION defaults to NAME."
         (ytr-org-perform-import-to-org-attachment-replacements
          (list ytr-org-test-attachment))
         (should (= (point) point-before))))))
+
+(ert-deftest ytr-org-find-node-searches-multiple-files ()
+  (let* ((file-1 (make-temp-file "ytr-org-test-1" nil ".org"))
+         (file-2 (make-temp-file "ytr-org-test-2" nil ".org"))
+         (ytr-org-files (list file-1 file-2))
+         (ytr-capture-key "")
+         (target-code "FOO-1"))
+    (unwind-protect
+        (progn
+          (with-temp-file file-1
+            (insert "* Other\n:PROPERTIES:\n:YTR_ISSUE_CODE: OTHER-1\n:END:\n"))
+          (with-temp-file file-2
+            (insert "* Target\n:PROPERTIES:\n:YTR_ISSUE_CODE: FOO-1\n:END:\n"))
+          (cl-letf (((symbol-function 'ytr-issue-node-code-action)
+                     (lambda (_issue-node-cons) target-code))
+                    ((symbol-function 'switch-to-buffer)
+                     (lambda (buffer-or-name &rest _args)
+                       (set-buffer buffer-or-name))))
+            (ytr-find-org-node-action '("FOO-1" . nil))
+            (should (string= (buffer-file-name) file-2))
+            (should (org-at-heading-p))
+            (should (string= (org-get-heading t t t t) "Target"))))
+      (when (get-file-buffer file-1)
+        (kill-buffer (get-file-buffer file-1)))
+      (when (get-file-buffer file-2)
+        (kill-buffer (get-file-buffer file-2)))
+      (delete-file file-1)
+      (delete-file file-2))))
 
 (provide 'ytr-org-test)
 ;;; ytr-org-test.el ends here
