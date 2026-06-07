@@ -257,26 +257,30 @@ returning the first non-nil result."
         (ytr-issue-comment-url (cons issue-code node-code))
       (ytr-issue-url issue-code))))
 
-(defun ytr-copy-url-action (issue-node-cons)
+(defun ytr-copy-url-action (&optional issue-node-cons)
   "Copy URL for ISSUE-NODE-CONS to kill ring."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (let ((url (ytr-url issue-node-cons)))
     (message url)
     (kill-new url)))
 
-(defun ytr-issue-node-code-action (issue-node-cons)
+(defun ytr-issue-node-code-action (&optional issue-node-cons)
   "Return a string representing ISSUE-NODE-CONS."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (if (cdr issue-node-cons)
       (format "%s#%s" (car issue-node-cons) (cdr issue-node-cons))
     (car issue-node-cons)))
 
-(defun ytr-copy-issue-node-code-action (issue-node-cons)
+(defun ytr-copy-issue-node-code-action (&optional issue-node-cons)
   "Put a string for ISSUE-NODE-CONS on kill ring and print it as message."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (let ((issue-node-code (ytr-issue-node-code-action issue-node-cons)))
     (kill-new issue-node-code)
     (message issue-node-code)))
 
-(defun ytr-insert-issue-node-code-action (issue-node-cons)
+(defun ytr-insert-issue-node-code-action (&optional issue-node-cons)
   "Insert a string for ISSUE-NODE-CONS."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (insert (ytr-issue-node-code-action issue-node-cons)))
 
 (defalias 'ytr-message-issue-node-code-action 'ytr-copy-issue-node-code-action
@@ -284,8 +288,9 @@ returning the first non-nil result."
 
 ;;;; Browser actions
 
-(defun ytr-browse-action (issue-node-cons)
+(defun ytr-browse-action (&optional issue-node-cons)
   "Open ISSUE-NODE-CONS in web browser."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (browse-url (ytr-url issue-node-cons)))
 
 (defun ytr-read-refine-browse ()
@@ -355,8 +360,9 @@ Smart form guesses issue from context."
 
 ;;;; Action definitions
 
-(defun ytr-message-action (issue-node-cons)
+(defun ytr-message-action (&optional issue-node-cons)
   "Display ISSUE-NODE-CONS as message."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (message "Issue Code %s, Node Code %s" (car issue-node-cons) (cdr issue-node-cons)))
 
 (ytr-define-action "message-issue-node-code" 'ytr-message-issue-node-code-action)
@@ -374,6 +380,17 @@ Smart form guesses issue from context."
 (ytr-define-action "find-org-node" 'ytr-find-org-node-action)
 (ytr-define-action "insert-issue" 'ytr-insert-issue-action)
 
+;;;; Issue Node Code Selection Strategy
+
+(defun ytr-get-issue-node-cons-by-strategy ()
+  "Receive an issue node cons from the user by selecting a strategy."
+  (pcase (read-char-choice
+          "Issue via: [g]uess/[s]elect/[m]anual: "
+          '(?g ?s ?m))
+    (?g (ytr-guess-or-select-issue-node-cons))
+    (?s (ytr-select-issue-node-cons))
+    (?m (ytr-to-issue-node-cons
+         (read-string "Issue: ")))))
 
 ;;;; Provide
 

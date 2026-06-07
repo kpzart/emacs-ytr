@@ -614,8 +614,9 @@ ATTACH-DIR is the org attachment directory."
                   ytr-buffer-commit-type 'create
                   ytr-buffer-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text))))))
 
-(defun ytr-quick-comment-action (issue-node-cons)
+(defun ytr-quick-comment-action (&optional issue-node-cons)
   "Open a markdown buffer to write a quick comment for ISSUE-NODE-CONS."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (let ((issue-code (car issue-node-cons))
         (wconf (current-window-configuration)))
     (switch-to-buffer-other-window (get-buffer-create "*YTR Compose Comment*"))
@@ -630,8 +631,9 @@ ATTACH-DIR is the org attachment directory."
                 ytr-buffer-commit-type 'create
                 ytr-buffer-local-content-hash nil)))
 
-(defun ytr-quick-node-edit-action (issue-node-cons)
+(defun ytr-quick-node-edit-action (&optional issue-node-cons)
   "Open a markdown buffer to edit a node for ISSUE-NODE-CONS."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (let ((issue-code (car issue-node-cons))
         (node-code (cdr issue-node-cons))
         (wconf (current-window-configuration)))
@@ -712,8 +714,9 @@ ATTACH-DIR is the org attachment directory."
       (ytr-update-remote-node-editable)
     (ytr-new-comment-editable)))
 
-(defun ytr-insert-issue-action (issue-node-cons)
+(defun ytr-insert-issue-action (&optional issue-node-cons)
   "Insert an issue at point given by ISSUE-NODE-CONS."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (save-excursion
     (let* ((issue-code (car issue-node-cons))
            (curlevel (org-current-level))
@@ -824,8 +827,9 @@ that are no ytr nodes. Does not update links and attachment sections."
 
 ;;;; Org actions
 
-(defun ytr-org-action (issue-node-cons)
+(defun ytr-org-action (&optional issue-node-cons)
   "Display ISSUE-NODE-CONS in an org buffer."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (let* ((issue-code (car issue-node-cons))
          (node-code (cdr issue-node-cons)))
     (ytr-issue-alist-to-org-buffer (ytr-retrieve-issue-alist issue-code))
@@ -837,9 +841,10 @@ that are no ytr nodes. Does not update links and attachment sections."
       (search-forward-regexp (format ":%s: *%s" ytr-org-issue-code-property-name (ytr-issue-node-code-action (cons issue-code node-code))) nil t)
       (org-back-to-heading))))
 
-(defun ytr-org-link-heading-action (issue-node-cons)
+(defun ytr-org-link-heading-action (&optional issue-node-cons)
   "Set Property YTR_ISSUE_CODE on org heading and append tag YTR.
 ISSUE-NODE-CONS is (issue-code . node-code)."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (save-excursion
     (org-set-property ytr-org-issue-code-property-name (car issue-node-cons))
     (org-back-to-heading)
@@ -860,8 +865,9 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
           issues-alist)
     (switch-to-buffer bufname)))
 
-(defun ytr-send-attachments-action (issue-node-cons)
+(defun ytr-send-attachments-action (&optional issue-node-cons)
   "Send the attachments at org heading to ISSUE-NODE-CONS and remove them locally."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (when (and (org-attach-dir) (org-attach-file-list (org-attach-dir)))
     (let* ((paths (mapcar (lambda (filename)
                             (file-name-concat (expand-file-name (org-attach-dir)) filename))
@@ -875,8 +881,9 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
               (message "Attachments deleted.")))
         (message "Canceled by user.")))))
 
-(defun ytr-find-org-node-action (issue-node-cons)
+(defun ytr-find-org-node-action (&optional issue-node-cons)
   "Find the first node with ISSUE-NODE-CONS in `ytr-org-files'."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (let ((regexp (format "^[   ]*:%s:[   ]*%s$"
                         ytr-org-issue-code-property-name
                         (ytr-issue-node-code-action issue-node-cons)))
@@ -989,8 +996,9 @@ ISSUE-PROPERTIES overrides the default properties to display."
 
 ;;;; Capture
 
-(defun ytr-capture-action (issue-node-cons)
+(defun ytr-capture-action (&optional issue-node-cons)
   "Capture a proxy org task that references ISSUE-NODE-CONS on ytr."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (let-alist (ytr-retrieve-issue-alist (car issue-node-cons))
     (setq ytr-capture-summary .summary)
     (setq ytr-capture-issue-code .idReadable)

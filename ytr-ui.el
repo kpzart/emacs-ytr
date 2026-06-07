@@ -333,9 +333,10 @@ ISSUE-ALIST is the issue data, NODE-CODE is the comment id."
       (princ "\n------------------------\n")
       (princ .text))))
 
-(defun ytr-sneak-action (issue-node-cons)
+(defun ytr-sneak-action (&optional issue-node-cons)
   "Display a side window with some basic information on issue and comment.
 ISSUE-NODE-CONS is a cons cell (issue-code . node-code)."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (let* ((issue-code (car issue-node-cons))
          (node-code (cdr issue-node-cons))
          (issue-alist (ytr-retrieve-issue-alist issue-code)))
