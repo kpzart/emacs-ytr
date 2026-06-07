@@ -97,7 +97,7 @@ One of `kill', `fetch', `keep' or `keep-content'."
     ytr-issue-node-cons-from-line
     ytr-issue-node-cons-from-org-property
     ytr-issue-node-cons-from-local-variable)
-  "Functions used by `ytr-guess-issue-code' to guess an issue code.
+  "Functions used by `ytr-guess-issue-node-cons' to guess an issue code.
 
 Each function is called with no arguments and should return an issue code
 string, or nil if it cannot guess one.  Functions are tried in order."
@@ -217,11 +217,6 @@ returning the first non-nil result."
         (when issue-node-cons
           (throw 'issue-node-cons issue-node-cons))))
     nil))
-
-(defun ytr-guess-or-read-issue-code ()
-  "Guess issue code from context or start a query."
-  (let ((guess (ytr-guess-issue-code)))
-    (if guess guess (ytr-read-issue-code))))
 
 (defun ytr-guess-or-read-issue-node-cons ()
   "Guess issue code with node code from context or start a query."
