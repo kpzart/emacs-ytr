@@ -372,6 +372,7 @@ Smart form guesses issue from context."
 (ytr-define-action "quick-comment" 'ytr-quick-comment-action)
 (ytr-define-action "quick-node-edit" 'ytr-quick-node-edit-action)
 (ytr-define-action "find-org-node" 'ytr-find-org-node-action)
+(ytr-define-action "insert-issue" 'ytr-insert-issue-action)
 
 ;;;; Provide
 

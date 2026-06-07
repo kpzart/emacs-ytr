@@ -712,6 +712,14 @@ ATTACH-DIR is the org attachment directory."
       (ytr-update-remote-node-editable)
     (ytr-new-comment-editable)))
 
+(defun ytr-insert-issue-action (issue-node-cons)
+  "Insert an issue at point given by ISSUE-NODE-CONS."
+  (save-excursion
+    (let* ((issue-code (car issue-node-cons))
+           (curlevel (org-current-level))
+           (issue-alist (ytr-retrieve-issue-alist issue-code)))
+      (ytr-insert-issue-alist-as-org issue-alist curlevel))))
+
 (defun ytr-fetch-remote-issue (&optional issue-alist)
   "Update a local issue at point with its remote content.
 If ISSUE-ALIST is not given, it will be retrieved.
