@@ -712,8 +712,32 @@ ATTACH-DIR is the org attachment directory."
       (ytr-update-remote-node-editable)
     (ytr-new-comment-editable)))
 
+(defun ytr-fetch-remote-issue (&optional issue-alist)
+  "Update a local issue at point with its remote content.
+If ISSUE-ALIST is not given, it will be retrieved.
+Local tags at the issue are kept."
+  (interactive)
+  (if (y-or-n-p "Local edit will be overwritten. Really Fetch whole issue unconditionally?")
+      (save-excursion
+        (let* ((node-type (or (ytr-find-node) (user-error "Could not find an issue to fetch")))
+               (issue-node-cons (ytr-issue-node-cons-from-org-property))
+               (issue-code (car issue-node-cons))
+               (curlevel (org-current-level))
+               (tags (org-get-tags nil t)))
+          (unless (eq node-type 'issue)
+            (user-error "Node %s is not an issue" (ytr-issue-node-code-action issue-node-cons)))
+          (unless issue-alist
+            (setq issue-alist (ytr-retrieve-issue-alist issue-code)))
+          (let ((inhibit-read-only t))
+            (org-mark-subtree)
+            (kill-region (point) (mark))
+            (save-excursion
+              (ytr-insert-issue-alist-as-org issue-alist curlevel))
+            (org-set-tags tags)))))
+  (message "Aborted!"))
+
 (defun ytr-fetch-remote-node (&optional node-alist trust-hash)
-  "Update a local node at point with its remote content.
+  "Update a local comment or description at point with its remote content.
 If NODE-ALIST is not given, it will be retrieved.
 If TRUST-HASH is non-nil, skip fetching if hashes match."
   (interactive)
@@ -722,20 +746,22 @@ If TRUST-HASH is non-nil, skip fetching if hashes match."
            (issue-node-cons (ytr-issue-node-cons-from-org-property))
            (issue-code (car issue-node-cons))
            (node-code (cdr issue-node-cons))
-           (curlevel (org-current-level))
-           (tags (org-get-tags nil t)))
+           (curlevel (org-current-level)))
+      (when (eq node-type 'issue)
+        (user-error "Use `ytr-fetch-remote-issue' to fetch whole issues"))
+      (unless (member node-type '(comment description))
+        (user-error "Bad node type %s" node-type))
       (when (or (not (ytr-node-locally-edited-p t))
                 (and (y-or-n-p (format "Node %s was edited locally! Fetch anyway?" (ytr-issue-node-code-action issue-node-cons)))
                      (or (setq trust-hash nil) t))) ; in this case, fetch even when remote hash is current, in order to restore remote content
         (unless node-alist
           (setq node-alist (cl-case node-type
                              (comment (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))
-                             (t (ytr-retrieve-issue-alist issue-code)))))
+                             (description (ytr-retrieve-issue-alist issue-code)))))
         (if (and trust-hash
                  (not (ytr-node-remotely-edited-p (or (alist-get (cl-case node-type
                                                                    (comment 'text)
-                                                                   (description 'description)
-                                                                   (t (user-error "Bad node type %s" node-type)))
+                                                                   (description 'description))
                                                                  node-alist)
                                                       ""))))
             (message "Node %s already up-to-date" (ytr-issue-node-code-action issue-node-cons))
@@ -746,10 +772,7 @@ If TRUST-HASH is non-nil, skip fetching if hashes match."
               (description (let-alist node-alist
                              (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments nil)))
               (comment (let-alist node-alist
-                         (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments .deleted)))
-              (issue (save-excursion (ytr-insert-issue-alist-as-org node-alist curlevel))
-                     (org-set-tags tags))
-              (t (user-error "Bad node type %s" node-type)))))))))
+                         (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments .deleted))))))))))
 
 ;;;; Org actions
 
