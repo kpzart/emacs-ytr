@@ -116,7 +116,7 @@ Here is my own spacemacs configuration, that may help you:
 (spacemacs/set-leader-keys "ot C-l" 'ytr-dart-org-link-heading)
 (spacemacs/set-leader-keys "otg" 'ytr-guess-shortcode)
 (spacemacs/set-leader-keys "ots" 'ytr-send-node)
-(spacemacs/set-leader-keys "otr" 'ytr-fetch-remote-node)
+(spacemacs/set-leader-keys "otr" 'ytr-org-fetch-remote-node)
 (spacemacs/set-leader-keys "otn" 'ytr-new-issue)
 (spacemacs/set-leader-keys "otN" 'ytr-browse-new-issue)
 (spacemacs/set-leader-keys "otb" 'ytr-shortcode-buttonize-buffer)

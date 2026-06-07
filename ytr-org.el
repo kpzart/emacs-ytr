@@ -582,7 +582,7 @@ ATTACH-DIR is the org attachment directory."
            (org-mark-subtree)
            (kill-region (point) (mark)))
           (fetch
-           (ytr-fetch-remote-node)))
+           (ytr-org-fetch-remote-node)))
         (ytr-issue-node-code-buttonize-buffer)))))
 
 ;;;; Interactive editing functions
@@ -720,31 +720,7 @@ ATTACH-DIR is the org attachment directory."
            (issue-alist (ytr-retrieve-issue-alist issue-code)))
       (ytr-insert-issue-alist-as-org issue-alist curlevel))))
 
-(defun ytr-fetch-remote-issue (&optional issue-alist)
-  "Update a local issue at point with its remote content.
-If ISSUE-ALIST is not given, it will be retrieved.
-Local tags at the issue are kept."
-  (interactive)
-  (if (y-or-n-p "Local edit will be overwritten. Really Fetch whole issue unconditionally?")
-      (save-excursion
-        (let* ((node-type (or (ytr-find-node) (user-error "Could not find an issue to fetch")))
-               (issue-node-cons (ytr-issue-node-cons-from-org-property))
-               (issue-code (car issue-node-cons))
-               (curlevel (org-current-level))
-               (tags (org-get-tags nil t)))
-          (unless (eq node-type 'issue)
-            (user-error "Node %s is not an issue" (ytr-issue-node-code-action issue-node-cons)))
-          (unless issue-alist
-            (setq issue-alist (ytr-retrieve-issue-alist issue-code)))
-          (let ((inhibit-read-only t))
-            (org-mark-subtree)
-            (kill-region (point) (mark))
-            (save-excursion
-              (ytr-insert-issue-alist-as-org issue-alist curlevel))
-            (org-set-tags tags)))))
-  (message "Aborted!"))
-
-(defun ytr-fetch-remote-node (&optional node-alist trust-hash)
+(defun ytr-org-fetch-remote-node (&optional node-alist trust-hash)
   "Update a local comment or description at point with its remote content.
 If NODE-ALIST is not given, it will be retrieved.
 If TRUST-HASH is non-nil, skip fetching if hashes match."
@@ -781,6 +757,70 @@ If TRUST-HASH is non-nil, skip fetching if hashes match."
                              (ytr-org-insert-node .description curlevel 'description (cons issue-code node-code) (alist-get 'fullName .reporter) .created .updated .attachments nil)))
               (comment (let-alist node-alist
                          (ytr-org-insert-node .text curlevel 'comment (cons issue-code node-code) (alist-get 'fullName .author) .created .updated .attachments .deleted))))))))))
+
+(define-error 'ytr-key-error "Key not found" 'error)
+
+(defun ytr-org-fetch-remote-issue ()
+  "Merge the issue node at point with remote data.
+Find the issue node at point, call fetch for all subnodes that
+are not locally edited and append missing nodes. Skip subheadings
+that are no ytr nodes. Does not update links and attachment sections."
+  (interactive)
+  (save-mark-and-excursion
+    (unless (ytr-find-node 'issue)
+      (user-error "Could not find an issue at point"))
+    (let* ((issue-code (car (ytr-issue-node-cons-from-org-property)))
+           (issue-alist (ytr-retrieve-issue-alist issue-code))
+           (processed-node-codes '())
+           (nodes-updated 0)
+           (nodes-inserted 0))
+      (let* ((level (org-current-level))
+             (end (save-excursion (org-end-of-subtree t t))))
+        (while (and (< (point) end)
+                    (re-search-forward org-heading-regexp end t))
+          (when (= (org-current-level) (1+ level))
+            (let* ((current-point (point))
+                   (issue-node-code (org-entry-get (point) ytr-org-issue-code-property-name))
+                   (node-type (org-entry-get (point) ytr-org-node-type-property-name))
+                   node-code)
+              (when (and issue-node-code node-type)
+                (message "Found %s %s at %s" node-type issue-node-code (point))
+                (condition-case err
+                    (ytr-org-fetch-remote-node (cl-case (intern node-type)
+                                                 (description issue-alist)
+                                                 (comment (setq node-code (cdr (ytr-to-issue-node-cons issue-node-code)))
+                                                          (push node-code processed-node-codes)
+                                                          (or (cl-find-if (lambda (comment-alist)
+                                                                            (string= (alist-get 'id comment-alist) node-code))
+                                                                          (alist-get 'comments issue-alist))
+                                                              (signal 'ytr-key-error issue-node-code)))
+                                                 (t (user-error "Bad note type %s" node-type)))
+                                               'trust-hash)
+                  (ytr-key-error (message "Ignoring unknown node %s" (cdr err))))
+                (setq nodes-updated (1+ nodes-updated))
+                (goto-char current-point) ; for some reason save-excursion does not work reliably here (maybe because buffer shrinks)
+                ))))
+        (goto-char end)
+        (insert "\n\n")
+        (mapc (lambda (comment-alist)
+                (let-alist comment-alist
+                  (ytr-org-insert-node .text (+ 1 level) 'comment (cons issue-code .id) (alist-get 'fullName .author) .created .updated .attachments .deleted)
+                  (setq nodes-inserted (1+ nodes-inserted))
+                  ))
+              (seq-filter (lambda (comment-alist)
+                            (not (or (member (alist-get 'id comment-alist) processed-node-codes)
+                                     (eq (alist-get 'deleted comment-alist) t))))
+                          (alist-get 'comments issue-alist))))
+      (message "%s nodes fetched and %s nodes inserted." nodes-updated nodes-inserted))))
+
+(defun ytr-org-fetch-remote-node-or-issue ()
+  "Call fetch on issue or node depending on node type under point."
+  (interactive)
+  (cl-case (ytr-find-node)
+    (description (ytr-org-fetch-remote-node))
+    (comment (ytr-org-fetch-remote-node))
+    (issue (ytr-org-fetch-remote-issue))
+    (t (user-error "Could not find a node to fetch"))))
 
 ;;;; Org actions
 
@@ -946,56 +986,6 @@ ISSUE-PROPERTIES overrides the default properties to display."
     (user-error nil)))
 
 (add-to-list 'org-ctrl-c-ctrl-c-hook #'ytr-update-org-query-table-hook)
-
-;;;; Merge operations
-
-(define-error 'ytr-key-error "Key not found" 'error)
-
-(defun ytr-merge-issue-node ()
-  "Merge the issue node at point with remote data.
-Find the issue node at point, call fetch for all subnodes that
-are not locally edited and append missing nodes. Skip subheadings
-that are no ytr nodes."
-  (interactive)
-  (save-mark-and-excursion
-    (when (ytr-find-node 'issue)
-      (let* ((issue-code (car (ytr-issue-node-cons-from-org-property)))
-             (issue-alist (ytr-retrieve-issue-alist issue-code))
-             (processed-node-codes '()))
-        (let* ((level (org-current-level))
-               (end (save-excursion (org-end-of-subtree t t))))
-          (while (and (< (point) end)
-                      (re-search-forward org-heading-regexp end t))
-            (when (= (org-current-level) (1+ level))
-              (let* ((current-point (point))
-                     (issue-node-code (org-entry-get (point) ytr-org-issue-code-property-name))
-                     (node-type (org-entry-get (point) ytr-org-node-type-property-name))
-                     node-code)
-                (when (and issue-node-code node-type)
-                  (message "Found %s %s at %s" node-type issue-node-code (point))
-                  (condition-case err
-                      (ytr-fetch-remote-node (cl-case (intern node-type)
-                                               (description issue-alist)
-                                               (comment (setq node-code (cdr (ytr-to-issue-node-cons issue-node-code)))
-                                                        (push node-code processed-node-codes)
-                                                        (or (cl-find-if (lambda (comment-alist)
-                                                                          (string= (alist-get 'id comment-alist) node-code))
-                                                                        (alist-get 'comments issue-alist))
-                                                            (signal 'ytr-key-error issue-node-code)))
-                                               (t (user-error "Bad note type %s" node-type)))
-                                             'trust-hash)
-                    (ytr-key-error (message "Ignoring unknown node %s" (cdr err))))
-                  (goto-char current-point) ; for some reason save-excursion does not work reliably here (maybe because buffer shrinks)
-                  ))))
-          (goto-char end)
-          (insert "\n\n")
-          (mapcar (lambda (comment-alist)
-                    (let-alist comment-alist
-                      (ytr-org-insert-node .text (+ 1 level) 'comment (cons issue-code .id) (alist-get 'fullName .author) .created .updated .attachments .deleted)))
-                  (seq-filter (lambda (comment-alist)
-                                (not (or (member (alist-get 'id comment-alist) processed-node-codes)
-                                         (eq (alist-get 'deleted comment-alist) t))))
-                              (alist-get 'comments issue-alist))))))))
 
 ;;;; Capture
 
