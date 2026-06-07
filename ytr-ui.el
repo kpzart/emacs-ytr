@@ -84,7 +84,7 @@ ISSUE-ALIST is the issue data."
   (let* ((issue-code (car (split-string cand ":")))
          (issue-alist (cl-find-if (lambda (elem)
                                     (string= (alist-get 'idReadable elem) issue-code))
-                                  ytr-issues-alist))) ;; ytr-issues-alist comes from ytr-read-issue-code-annotated via dynamic binding!
+                                  ytr-issues-alist))) ;; ytr-issues-alist comes from ytr-select-issue-code-annotated via dynamic binding!
     (let-alist issue-alist
       (marginalia--fields
        ((ytr-get-customField-value issue-alist "Priority") :format "Pr: %s" :truncate .2 :face 'marginalia-documentation)
@@ -102,7 +102,7 @@ ISSUE-ALIST is the issue data."
          (total (alist-get 'issues query-alist))
          (unresolved (seq-drop-while (lambda (issue) (alist-get 'resolved issue)) total))
          (mine (seq-take-while (lambda (issue) (string= ytr-user-full-name (ytr-get-customField-value issue "Assignee"))) unresolved))
-         ) ;; queries-alist comes from ytr-read-issue-code-annotated via dynamic binding!
+         ) ;; queries-alist comes from ytr-select-issue-code-annotated via dynamic binding!
     (marginalia--fields
      (name :truncate .5 :face 'marginalia-documentation)
      ((length total) :format "Total: %s" :truncate .2 :face 'marginalia-type)
@@ -110,9 +110,9 @@ ISSUE-ALIST is the issue data."
      ((length mine) :format "Mine: %s" :truncate .2 :face 'marginalia-type)
      )))
 
-;;;; Basic reading functions
+;;;; Basic selection functions
 
-(defun ytr-read-issue-code-basic ()
+(defun ytr-select-issue-code-basic ()
   "Return an issue code from a query using basic completion."
   (let* ((query (completing-read "Query: " ytr-queries nil nil))
          (issues-alist (ytr-retrieve-query-issues-alist query))
@@ -122,7 +122,7 @@ ISSUE-ALIST is the issue data."
          (choice (completing-read "Issue: " choices)))
     (car (split-string choice ":"))))
 
-(defun ytr-read-issue-code-annotated ()
+(defun ytr-select-issue-code-annotated ()
   "Return an issue-code from a query with marginalia annotations."
   (interactive)
   (let ((query (completing-read "Query: " ytr-queries nil nil)))
@@ -144,7 +144,7 @@ ACTION is the consult action, CAND is the candidate."
               (cl-find-if (lambda (elem) (string= (alist-get 'idReadable elem) (car (split-string cand ":")))) ytr-issues-alist)))
     (exit (quit-window))))
 
-(defun ytr-read-issue-code-from-query-consult (query)
+(defun ytr-select-issue-code-from-query-consult (query)
   "Use consult to get the issue code from a given QUERY."
   (let* ((ytr-issues-alist (ytr-retrieve-query-issues-alist query))
          (choices (mapcar (lambda (item)
@@ -159,13 +159,13 @@ ACTION is the consult action, CAND is the candidate."
                                       )
                        ":"))))
 
-(defun ytr-read-query-var-consult ()
+(defun ytr-select-query-var-consult ()
   "Use consult to get a query from custom var."
   (consult--read ytr-queries
                  :sort nil
                  :history 'ytr-query-history))
 
-(defun ytr-read-query-saved-consult ()
+(defun ytr-select-query-saved-consult ()
   "Use consult to get a query from saved queries."
   (let* ((ytr-queries-alist (ytr-retrieve-saved-queries-alist))
          (queries-alist-filtered (seq-filter (lambda (elem)
@@ -178,13 +178,13 @@ ACTION is the consult action, CAND is the candidate."
                    :category 'ytr-query
                    :history 'ytr-query-history)))
 
-(defun ytr-read-query-consult ()
+(defun ytr-select-query-consult ()
   "Use consult to read a query."
-  (if ytr-use-saved-queries (ytr-read-query-saved-consult) (ytr-read-query-var-consult)))
+  (if ytr-use-saved-queries (ytr-select-query-saved-consult) (ytr-select-query-var-consult)))
 
-(defun ytr-read-issue-code-consult ()
+(defun ytr-select-issue-code-consult ()
   "Use consult to read a issue code."
-  (ytr-read-issue-code-from-query-consult (if ytr-use-saved-queries (ytr-read-query-saved-consult) (ytr-read-query-var-consult))))
+  (ytr-select-issue-code-from-query-consult (ytr-select-query-consult)))
 
 ;;;; Embark integration
 

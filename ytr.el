@@ -47,6 +47,7 @@
 ;;;; Dependencies
 
 (require 'ffap)
+(require 'hydra)
 
 ;;;; Load ytr modules
 (require 'ytr-api)
@@ -87,10 +88,10 @@ One of `kill', `fetch', `keep' or `keep-content'."
 
 (defcustom ytr-only-own-saved-queries t "Filter out saved queries from others." :type 'boolean :group 'ytr)
 
-(defcustom ytr-read-issue-code-function 'ytr-read-issue-code-basic
+(defcustom ytr-select-issue-code-function 'ytr-select-issue-code-basic
   "Select Input Method to read an issue-code from user."
   :type 'function :group 'ytr
-  :options '(ytr-read-issue-code-basic ytr-read-issue-code-annotated ytr-read-issue-code-consult))
+  :options '(ytr-select-issue-code-basic ytr-select-issue-code-annotated ytr-select-issue-code-consult))
 
 (defcustom ytr-guess-issue-node-cons-functions
   '(ytr-issue-node-cons-from-point
@@ -164,9 +165,10 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
 
 (add-to-list 'ffap-string-at-point-mode-alist '(ytr "0-9a-zA-Z#-" "" ""))
 
-(defun ytr-to-issue-node-cons (issue-node-code)
+(defun ytr-to-issue-node-cons (&optional issue-node-code)
   "Parse ISSUE-NODE-CODE string for an issue and a node code if present.
 Return a cons (issue-code . node-code)."
+  (interactive "sIssue Code (may also have Node Code): ")
   (if (and issue-node-code (string-match (ytr-delim-pattern ytr-issue-node-code-pattern) issue-node-code))
       (cons (match-string 1 issue-node-code) (match-string 2 issue-node-code))
     nil))
@@ -218,10 +220,10 @@ returning the first non-nil result."
           (throw 'issue-node-cons issue-node-cons))))
     nil))
 
-(defun ytr-guess-or-read-issue-node-cons ()
+(defun ytr-guess-or-select-issue-node-cons ()
   "Guess issue code with node code from context or start a query."
   (let ((guess (ytr-guess-issue-node-cons)))
-    (if guess guess (cons (ytr-read-issue-code) nil))))
+    (if guess guess (cons (ytr-select-issue-code) nil))))
 
 ;;;; History functions
 
@@ -236,11 +238,14 @@ returning the first non-nil result."
   (delete issue-node-code ytr-issue-history)
   (push issue-node-code ytr-issue-history))
 
-;;;; Reading functions wrapper
+;;;; Selection functions wrapper
 
-(defun ytr-read-issue-code ()
+(defun ytr-select-issue-code ()
   "Wrapper function to read an issue code from user."
-  (funcall ytr-read-issue-code-function))
+  (funcall ytr-select-issue-code-function))
+
+(defun ytr-select-issue-node-cons ()
+  (cons (ytr-select-issue-code) nil))
 
 ;;;; URL and code actions
 
@@ -300,7 +305,7 @@ returning the first non-nil result."
   "Open web browser to execute QUERY."
   (interactive (list
                 (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
-                  (ytr-read-query-consult))))
+                  (ytr-select-query-consult))))
   (browse-url (concat ytr-baseurl "/issues?q=" query)))
 
 ;;;; Action macros
@@ -327,7 +332,7 @@ Base form retrieves an issue from query."
      ,(format "Base form of %s." name)
      (interactive (list
                    (let ((ytr-use-saved-queries (and ytr-use-saved-queries (not current-prefix-arg))))
-                     (ytr-read-issue-code))))
+                     (ytr-select-issue-code))))
      (ytr-add-issue-to-history issue-code)
      (funcall ,action (cons issue-code nil))))
 
@@ -336,7 +341,7 @@ Base form retrieves an issue from query."
 Smart form guesses issue from context."
   `(defun ,(intern (format "ytr-smart-%s" name)) (issue-node-code)
      ,(format "Smart form of %s." name)
-     (interactive (list (ytr-guess-or-read-issue-node-cons)))
+     (interactive (list (ytr-guess-or-select-issue-node-cons)))
      (ytr-add-issue-to-history (car issue-node-code))
      (funcall ,action issue-node-code)))
 
@@ -368,6 +373,7 @@ Smart form guesses issue from context."
 (ytr-define-action "quick-node-edit" 'ytr-quick-node-edit-action)
 (ytr-define-action "find-org-node" 'ytr-find-org-node-action)
 (ytr-define-action "insert-issue" 'ytr-insert-issue-action)
+
 
 ;;;; Provide
 

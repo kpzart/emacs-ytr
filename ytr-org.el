@@ -45,12 +45,12 @@
 ;;;; Forward declarations
 (declare-function ytr-issue-node-code-action "ytr")
 (declare-function ytr-to-issue-node-cons "ytr")
-(declare-function ytr-guess-or-read-issue-node-cons "ytr")
+(declare-function ytr-guess-or-select-issue-node-cons "ytr")
 (declare-function ytr-guess-issue-node-cons "ytr")
 (declare-function ytr-add-issue-to-history "ytr")
 (declare-function ytr-issue-node-cons-from-org-property "ytr")
 (declare-function ytr-issue-node-code-buttonize-buffer "ytr-ui")
-(declare-function ytr-read-query-consult "ytr-ui")
+(declare-function ytr-select-query-consult "ytr-ui")
 (declare-function ytr-issue-url "ytr")
 (declare-function ytr-issue-property-id "ytr-ui")
 (declare-function ytr-issue-property-summary "ytr-ui")
@@ -598,7 +598,7 @@ ATTACH-DIR is the org attachment directory."
     (let ((position (point))
           (text (buffer-substring-no-properties (region-beginning) (region-end)))
           (wconf (current-window-configuration))
-          (issue-code (car (ytr-guess-or-read-issue-node-cons)))
+          (issue-code (car (ytr-guess-or-select-issue-node-cons)))
           (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
           (attach-dir (or (org-attach-dir) "")))
       (org-gfm-export-as-markdown nil nil)
@@ -848,7 +848,7 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
 
 (defun ytr-org-query (query)
   "Convert all issues given by QUERY to org and collect them in a buffer."
-  (interactive (list (ytr-read-query-consult)))
+  (interactive (list (ytr-select-query-consult)))
   (let ((issues-alist (ytr-retrieve-query-issues-alist query))
         (bufname "*ytr-org-query*"))
     (set-buffer (get-buffer-create bufname))
@@ -924,7 +924,7 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
   "Execute QUERY and insert it as an org mode table.
 If NO-QUERY-KEYWORD is non-nil, don't insert the query keyword.
 ISSUE-PROPERTIES overrides the default properties to display."
-  (interactive (list (ytr-read-query-consult)))
+  (interactive (list (ytr-select-query-consult)))
   (let* ((issues-alist (ytr-retrieve-query-issues-alist query))
          (issue-properties (cons ytr-issue-property-id (cons ytr-issue-property-summary (or issue-properties ytr-issue-properties))))
          (table-data (cons
