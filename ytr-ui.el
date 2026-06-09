@@ -309,7 +309,8 @@ ISSUE-ALIST is the issue data."
                 .attachments))
         (insert (propertize "\n------------------------\n" 'face 'shadow))
         (if .description (insert .description))
-        (goto-char (point-min))))
+        (goto-char (point-min))
+        (setq ytr-local-issue-node-code .idReadable)))
     (display-buffer buf)))
 
 (defun ytr-sneak-window-comment (issue-alist node-code)
