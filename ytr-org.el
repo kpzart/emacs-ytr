@@ -587,7 +587,7 @@ ATTACH-DIR is the org attachment directory."
 
 ;;;; Interactive editing functions
 
-(defun ytr-new-comment-editable ()
+(defun ytr-new-comment ()
   "Send the current subtree or region as comment to a ticket."
   (interactive)
   (save-mark-and-excursion
@@ -675,7 +675,7 @@ ATTACH-DIR is the org attachment directory."
     (insert heading)
     (insert "/(Issue created from deleted content)/\n\n")))
 
-(defun ytr-update-remote-node-editable ()
+(defun ytr-update-remote-node ()
   "Update a node on remote side after editing locally."
   (interactive)
   (let* ((type (or (ytr-find-node) (user-error "Could not find a node to update")))
@@ -711,8 +711,8 @@ ATTACH-DIR is the org attachment directory."
   "Create a new comment or update the node, depending on context."
   (interactive)
   (if (member (org-entry-get (point) ytr-org-node-type-property-name t) (list "comment" "description"))
-      (ytr-update-remote-node-editable)
-    (ytr-new-comment-editable)))
+      (ytr-update-remote-node)
+    (ytr-new-comment)))
 
 (defun ytr-insert-issue-action (&optional issue-node-cons)
   "Insert an issue at point given by ISSUE-NODE-CONS."
