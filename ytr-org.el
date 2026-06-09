@@ -587,9 +587,9 @@ ATTACH-DIR is the org attachment directory."
 
 ;;;; Interactive editing functions
 
-(defun ytr-new-comment ()
-  "Send the current subtree or region as comment to a ticket."
-  (interactive)
+(defun ytr-new-comment-action (&optional issue-node-cons)
+  "Send the current subtree or region as comment to ticket ISSUE-NODE-CONS."
+  (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (save-mark-and-excursion
     (unless (region-active-p)
       (org-mark-subtree)
@@ -598,7 +598,7 @@ ATTACH-DIR is the org attachment directory."
     (let ((position (point))
           (text (buffer-substring-no-properties (region-beginning) (region-end)))
           (wconf (current-window-configuration))
-          (issue-code (car (ytr-guess-or-select-issue-node-cons)))
+          (issue-code (car issue-node-cons))
           (curlevel (+ (org-current-level) (if (org-at-heading-p) 0 1)))
           (attach-dir (or (org-attach-dir) "")))
       (org-gfm-export-as-markdown nil nil)
@@ -712,7 +712,7 @@ ATTACH-DIR is the org attachment directory."
   (interactive)
   (if (member (org-entry-get (point) ytr-org-node-type-property-name t) (list "comment" "description"))
       (ytr-update-remote-node)
-    (ytr-new-comment)))
+    (ytr-new-comment-action (ytr-get-issue-node-cons-by-strategy))))
 
 (defun ytr-insert-issue-action (&optional issue-node-cons)
   "Insert an issue at point given by ISSUE-NODE-CONS."
