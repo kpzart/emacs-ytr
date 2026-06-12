@@ -298,13 +298,19 @@ DELETED is t if the node is deleted."
       (insert "\n\n"))))
 
 (defun ytr-insert-issue-alist-as-org (issue-alist level)
-  "Insert the issue given by ISSUE-ALIST as org at point with heading LEVEL."
+  "Insert the issue given by ISSUE-ALIST as org at point with heading LEVEL.
+
+If LEVEL is nil, no heading for issue will be created. The comments and so
+will be at level 1."
   (let-alist issue-alist
-    (insert (format "%s %s: %s\n\n" (make-string level ?*) .idReadable .summary))
-    (open-line 1)  ;; need this to ensure props go to correct heading
-    (org-set-property ytr-org-issue-code-property-name .idReadable)
-    (org-set-property ytr-org-node-type-property-name "issue")
-    (kill-whole-line)  ;; kill line we just opened
+    (if (not level)
+        (setq level 0)
+      (insert (format "%s %s: %s\n\n" (make-string level ?*) .idReadable .summary))
+      (open-line 1)  ;; need this to ensure props go to correct heading
+      (org-set-property ytr-org-issue-code-property-name .idReadable)
+      (org-set-property ytr-org-node-type-property-name "issue")
+      (kill-whole-line)  ;; kill line we just opened
+      )
     (insert (format "%s Links\n\n" (make-string (+ 1 level) ?*)))
     (mapc (lambda (link-alist)
             (let-alist link-alist
