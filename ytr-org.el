@@ -887,7 +887,7 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
               (message "Attachments deleted.")))
         (message "Canceled by user.")))))
 
-(defun ytr-find-org-node-action (&optional issue-node-cons)
+(defun ytr-org-find-issue-action (&optional issue-node-cons)
   "Find the first node with ISSUE-NODE-CONS in `ytr-org-files'."
   (interactive (list (ytr-get-issue-node-cons-by-strategy)))
   (let ((regexp (format "^[   ]*:%s:[   ]*%s$"

@@ -136,7 +136,7 @@ DESCRIPTION defaults to NAME."
                     ((symbol-function 'switch-to-buffer)
                      (lambda (buffer-or-name &rest _args)
                        (set-buffer buffer-or-name))))
-            (ytr-find-org-node-action '("FOO-1" . nil))
+            (ytr-org-find-issue-action '("FOO-1" . nil))
             (should (string= (buffer-file-name) file-2))
             (should (org-at-heading-p))
             (should (string= (org-get-heading t t t t) "Target"))))

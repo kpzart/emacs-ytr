@@ -377,7 +377,7 @@ Smart form guesses issue from context."
 (ytr-define-action "send-attachments" 'ytr-send-attachments-action)
 (ytr-define-action "quick-comment" 'ytr-quick-comment-action)
 (ytr-define-action "quick-node-edit" 'ytr-quick-node-edit-action)
-(ytr-define-action "find-org-node" 'ytr-find-org-node-action)
+(ytr-define-action "org-find-issue" 'ytr-org-find-issue-action)
 (ytr-define-action "insert-issue" 'ytr-insert-issue-action)
 (ytr-define-action "new-comment" 'ytr-new-comment-action)
 
