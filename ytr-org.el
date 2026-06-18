@@ -371,7 +371,7 @@ will be at level 1."
 
 ;;;; Node finding and navigation
 
-(defun ytr-find-node (&optional type-wanted)
+(defun ytr-org-find-node (&optional type-wanted)
   "Find the parent heading with a YTR_NODE_TYPE property.
 
 Sets the point and returns the type. If property is not found in
@@ -391,7 +391,7 @@ This function may not be narrowing safe."
       (if (and type-found (or (not type-wanted)
                               (eq type-wanted (intern type-found))))
           (intern type-found)
-        (or (and (org-up-heading-or-point-min) (ytr-find-node type-wanted))
+        (or (and (org-up-heading-or-point-min) (ytr-org-find-node type-wanted))
             (and (goto-char saved-point) nil))))))
 
 (defun ytr-org-content-start (&optional ensure-content)
@@ -446,7 +446,7 @@ hash in property.
 If FALSE_IF_NO_NODE is non-nil, return nil instead of error when no node
 found."
   (save-mark-and-excursion
-    (if (not (member (ytr-find-node) (list 'comment 'description)))
+    (if (not (member (ytr-org-find-node) (list 'comment 'description)))
         (when (not false_if_no_node)
           (user-error "No hashable node found"))
       (let* ((saved-local-hash (org-entry-get (point) ytr-org-local-content-hash-property-name t))
@@ -464,7 +464,7 @@ of error when no node found."
   (unless remote-content
     (setq remote-content (alist-get 'text (ytr-retrieve-issue-comment-alist (ytr-guess-issue-node-cons)))))
   (save-mark-and-excursion
-    (if (not (member (ytr-find-node) (list 'comment 'description)))
+    (if (not (member (ytr-org-find-node) (list 'comment 'description)))
         (when (not false_if_no_node)
           (user-error "No hashable node found"))
       (let* ((saved-remote-hash (org-entry-get (point) ytr-org-remote-content-hash-property-name t))
@@ -692,7 +692,7 @@ ATTACH-DIR is the org attachment directory."
 (defun ytr-update-remote-node ()
   "Update a node on remote side after editing locally."
   (interactive)
-  (let* ((type (or (ytr-find-node) (user-error "Could not find a node to update")))
+  (let* ((type (or (ytr-org-find-node) (user-error "Could not find a node to update")))
          (issue-node-cons (ytr-issue-node-cons-from-org-property))
          (issue-code (car issue-node-cons))
          (node-code (cdr issue-node-cons))
@@ -743,7 +743,7 @@ If NODE-ALIST is not given, it will be retrieved.
 If TRUST-HASH is non-nil, skip fetching if hashes match."
   (interactive)
   (save-excursion
-    (let* ((node-type (or (ytr-find-node) (user-error "Could not find a node to fetch")))
+    (let* ((node-type (or (ytr-org-find-node) (user-error "Could not find a node to fetch")))
            (issue-node-cons (ytr-issue-node-cons-from-org-property))
            (issue-code (car issue-node-cons))
            (node-code (cdr issue-node-cons))
@@ -784,7 +784,7 @@ are not locally edited and append missing nodes. Skip subheadings
 that are no ytr nodes. Does not update links and attachment sections."
   (interactive)
   (save-mark-and-excursion
-    (unless (ytr-find-node 'issue)
+    (unless (ytr-org-find-node 'issue)
       (user-error "Could not find an issue at point"))
     (let* ((issue-code (car (ytr-issue-node-cons-from-org-property)))
            (issue-alist (ytr-retrieve-issue-alist issue-code))
@@ -833,7 +833,7 @@ that are no ytr nodes. Does not update links and attachment sections."
 (defun ytr-org-fetch-remote-node-or-issue ()
   "Call fetch on issue or node depending on node type under point."
   (interactive)
-  (cl-case (save-excursion (ytr-find-node))
+  (cl-case (save-excursion (ytr-org-find-node))
     (description (ytr-org-fetch-remote-node))
     (comment (ytr-org-fetch-remote-node))
     (issue (ytr-org-fetch-remote-issue))
