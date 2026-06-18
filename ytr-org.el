@@ -70,8 +70,9 @@
 (defcustom ytr-save-import-diff-inline-when-empty nil "Control whether an inline code block is written even if the diff is empty." :type 'boolean :group 'ytr)
 (defcustom ytr-import-diff-switches "--ignore-space-change" "Diff Switches used to create the import diff." :type 'string :group 'ytr)
 (defcustom ytr-org-files '("~/ytr.org")
-  "List of file paths used for persisting downloaded issues."
-  :type '(repeat file)
+  "List of file paths or wildcard patterns used for finding downloaded issues.
+Wildcard patterns such as \"~/ytr/*.org\" are expanded before searching."
+  :type '(repeat (choice file string))
   :group 'ytr)
 (defcustom ytr-org-enable-attachment-replacements nil
   "Whether ytr-org rewrites attachment links during import and export."
@@ -895,6 +896,31 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
               (message "Attachments deleted.")))
         (message "Canceled by user.")))))
 
+(defun ytr-org--wildcard-pattern-p (path)
+  "Return non-nil if PATH contains wildcard characters."
+  (string-match-p "[][*?]" path))
+
+(defun ytr-org--expand-files (paths)
+  "Expand PATHS to existing files.
+Entries may be normal file paths or wildcard patterns.  Duplicate files are
+removed.  Warn if a wildcard pattern matches no files or if a normal file path
+does not exist."
+  (delete-dups
+   (apply #'append
+          (mapcar
+           (lambda (path)
+             (let ((expanded (expand-file-name path)))
+               (if (ytr-org--wildcard-pattern-p expanded)
+                   (let ((matches (file-expand-wildcards expanded t)))
+                     (unless matches
+                       (message "ytr-org-files pattern matched no files: %s" path))
+                     matches)
+                 (if (file-exists-p expanded)
+                     (list expanded)
+                   (warn "ytr-org-files file does not exist: %s" path)
+                   nil))))
+           paths))))
+
 (defun ytr-org-find-issue-action (&optional issue-node-cons)
   "Find the first node with ISSUE-NODE-CONS in `ytr-org-files'."
   (interactive (list (ytr-get-issue-node-cons-by-strategy)))
@@ -902,7 +928,7 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
                         ytr-org-issue-code-property-name
                         (ytr-issue-node-code-action issue-node-cons)))
         found)
-    (dolist (file ytr-org-files)
+    (dolist (file (ytr-org--expand-files ytr-org-files))
       (unless found
         (with-current-buffer (find-file-noselect file)
           (let ((initial-point (point)))
@@ -910,7 +936,9 @@ ISSUE-NODE-CONS is (issue-code . node-code)."
             (if (re-search-forward regexp nil t)
                 (progn
                   (goto-char (match-beginning 0))
-                  (org-back-to-heading)
+                  (if (org-before-first-heading-p)
+                      (goto-char initial-point)
+                    (org-back-to-heading))
                   (setq found (current-buffer)))
               (goto-char initial-point))))))
     (if found
