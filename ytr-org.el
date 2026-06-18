@@ -376,15 +376,23 @@ will be at level 1."
 
 Sets the point and returns the type. If property is not found in
 all higher headings returns nil and restore point. If TYPE-WANTED
-is not nil search for that node type."
+is not nil search for that node type.
+
+File nodes (YTR_NODE_TYPE is set for the whole file) can be found and
+the point will be set to (point-min) in this case.
+
+This function may not be narrowing safe."
   (let ((saved-point (point)))
-    (when (or (org-at-heading-p) (org-back-to-heading))
-      (let ((type-found (org-entry-get (point) ytr-org-node-type-property-name)))
-        (if (and type-found (or (not type-wanted)
-                                (eq type-wanted (intern type-found))))
-            (intern type-found)
-          (or (and (org-up-heading-safe) (ytr-find-node type-wanted))
-              (and (goto-char saved-point) nil)))))))
+    (unless (org-at-heading-p)
+      (if (org-before-first-heading-p)
+          (goto-char (point-min))
+        (org-back-to-heading)))
+    (let ((type-found (org-entry-get (point) ytr-org-node-type-property-name)))
+      (if (and type-found (or (not type-wanted)
+                              (eq type-wanted (intern type-found))))
+          (intern type-found)
+        (or (and (org-up-heading-or-point-min) (ytr-find-node type-wanted))
+            (and (goto-char saved-point) nil))))))
 
 (defun ytr-org-content-start (&optional ensure-content)
   "Return the start of the real content of a heading.
@@ -783,7 +791,7 @@ that are no ytr nodes. Does not update links and attachment sections."
            (processed-node-codes '())
            (nodes-updated 0)
            (nodes-inserted 0))
-      (let* ((level (org-current-level))
+      (let* ((level (or (org-current-level) 0))
              (end (save-excursion (org-end-of-subtree t t))))
         (while (and (< (point) end)
                     (re-search-forward org-heading-regexp end t))
@@ -825,7 +833,7 @@ that are no ytr nodes. Does not update links and attachment sections."
 (defun ytr-org-fetch-remote-node-or-issue ()
   "Call fetch on issue or node depending on node type under point."
   (interactive)
-  (cl-case (ytr-find-node)
+  (cl-case (save-excursion (ytr-find-node))
     (description (ytr-org-fetch-remote-node))
     (comment (ytr-org-fetch-remote-node))
     (issue (ytr-org-fetch-remote-issue))
