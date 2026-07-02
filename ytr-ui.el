@@ -310,7 +310,7 @@ ISSUE-ALIST is the issue data."
         (insert (propertize "\n------------------------\n" 'face 'shadow))
         (if .description (insert .description))
         (goto-char (point-min))
-        (setq ytr-local-issue-node-code .idReadable)))
+        (setq ytr-buffer-issue-node-cons (cons .idReadable nil))))
     (display-buffer buf)))
 
 (defun ytr-sneak-window-comment (issue-alist node-code)

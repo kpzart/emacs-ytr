@@ -105,10 +105,6 @@ string, or nil if it cannot guess one.  Functions are tried in order."
   :type '(repeat function)
   :group 'ytr)
 
-;;;; Local Variables
-
-(defvar-local ytr-local-issue-node-code nil "Set issue node code locally")
-
 ;;;; History and state variables
 
 (defvar ytr-issue-history '() "History for issues.")
@@ -205,7 +201,7 @@ Return a cons (issue-code . node-code)."
 
 (defun ytr-issue-node-cons-from-local-variable ()
   "Return issue-node cons from local variable"
-  (ytr-to-issue-node-cons ytr-local-issue-node-code))
+  ytr-buffer-issue-node-cons)
 
 (defun ytr-guess-issue-node-cons ()
   "Return an issue code from current context.
