@@ -49,11 +49,10 @@
 (declare-function ytr-guess-issue-node-cons "ytr")
 (declare-function ytr-add-issue-to-history "ytr")
 (declare-function ytr-issue-node-cons-from-org-property "ytr")
+(declare-function ytr-get-issue-node-cons-by-strategy "ytr")
 (declare-function ytr-issue-node-code-buttonize-buffer "ytr-ui")
 (declare-function ytr-select-query-consult "ytr-ui")
 (declare-function ytr-issue-url "ytr")
-(declare-function ytr-issue-property-id "ytr-ui")
-(declare-function ytr-issue-property-summary "ytr-ui")
 
 ;;;; Property name constants
 (defconst ytr-org-issue-code-property-name "YTR_ISSUE_CODE" "Name of the property to store the org issue code.")
@@ -84,7 +83,7 @@ Wildcard patterns such as \"~/ytr/*.org\" are expanded before searching."
 (defvar-local ytr-buffer-text nil "Buffer local var to store text.")
 (defvar-local ytr-buffer-wconf nil "Buffer local var to store wconf.")
 (defvar-local ytr-buffer-curlevel nil "Buffer local var to store curlevel.")
-(defvar-local ytr-buffer-issue-code nil "Buffer local var to store issue-code.")
+(defvar-local ytr-buffer-issue-node-cons nil "Buffer local var to store issue and node.")
 (defvar-local ytr-buffer-node-code nil "Buffer local var to store node-code.")
 (defvar-local ytr-buffer-node-type nil "Buffer local var to store node-type.")
 (defvar-local ytr-buffer-commit-type nil "Buffer local var to store commit-type.")
@@ -523,63 +522,66 @@ ATTACH-DIR is the org attachment directory."
 (defun ytr-commit-new-comment ()
   "Commit buffer content as a new comment."
   (interactive)
-  (let ((new-node-code (or (alist-get 'id (ytr-send-new-comment-alist ytr-buffer-issue-code `((text . ,(buffer-string)))))
-                           (user-error "No node code retrieved")))
-        (issue-code ytr-buffer-issue-code) ;; These vars are buffer local and we are going to switch buffer
-        (curlevel ytr-buffer-curlevel)
-        (text ytr-buffer-text)
-        (position ytr-buffer-position)
-        (buffer (buffer-name))
-        (local-content-hash ytr-buffer-local-content-hash))
+  (let* (
+         (issue-code (car ytr-buffer-issue-node-cons)) ;; These vars are buffer local and we are going to switch buffer
+         (new-node-code (or (alist-get 'id (ytr-send-new-comment-alist issue-code `((text . ,(buffer-string)))))
+                            (user-error "No node code retrieved")))
+         (issue-comment-node-cons (cons issue-code new-node-code))
+         (curlevel ytr-buffer-curlevel)
+         (text ytr-buffer-text)
+         (position ytr-buffer-position)
+         (buffer (buffer-name))
+         (local-content-hash ytr-buffer-local-content-hash))
     (message "New comment created on %s with node code %s." issue-code new-node-code)
     (set-window-configuration ytr-buffer-wconf)
     (kill-buffer buffer)
-    (kill-new (ytr-issue-node-code-action (cons issue-code new-node-code)))
+    (kill-new (ytr-issue-node-code-action issue-comment-node-cons))
     (ytr-add-issue-to-history issue-code)
     (when position ;; use position as flag for source buffer
       (save-mark-and-excursion
         (if (derived-mode-p 'org-mode)
-            (ytr-send-attachments-action (cons issue-code new-node-code)))
+            (ytr-send-attachments-action issue-comment-node-cons))
         (goto-char position)
         (set-mark (+ position (length text)))
         (cl-case ytr-new-comment-behavior
           (keep (deactivate-mark))
           (keep-content
-           (let-alist (ytr-retrieve-issue-comment-alist (cons issue-code new-node-code))
+           (let-alist (ytr-retrieve-issue-comment-alist issue-comment-node-cons)
              (replace-regexp-in-region "^\\(\\*+ \\)" "*\\1" (point) (mark))
              (deactivate-mark)
              (goto-char position)
-             (ytr-org-insert-node nil curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments .deleted)
+             (ytr-org-insert-node nil curlevel 'comment issue-comment-node-cons (alist-get 'fullName .author) .created .updated .attachments .deleted)
              (setq local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing (buffer-substring-no-properties (point) (org-end-of-subtree)))))
              (goto-char position)
              (org-set-property ytr-org-remote-content-hash-property-name (if .text (sha1 .text) ""))
              (org-set-property ytr-org-local-content-hash-property-name local-content-hash)))
           (kill (kill-region (point) (mark)))
           (fetch
-           (let-alist (ytr-retrieve-issue-comment-alist (cons issue-code new-node-code))
+           (let-alist (ytr-retrieve-issue-comment-alist issue-comment-node-cons)
              (kill-region (point) (mark))
-             (ytr-org-insert-node .text curlevel 'comment (cons issue-code new-node-code) (alist-get 'fullName .author) .created .updated .attachments .deleted)
+             (ytr-org-insert-node .text curlevel 'comment issue-comment-node-cons (alist-get 'fullName .author) .created .updated .attachments .deleted)
              (goto-char position))))
         (ytr-issue-node-code-buttonize-buffer)))))
 
 (defun ytr-commit-update-node ()
   "Commit the buffer to youtrack to update a node."
   (interactive)
-  (let ((issue-code ytr-buffer-issue-code)
-        (node-code ytr-buffer-node-code)
-        (node-type ytr-buffer-node-type)
-        (position ytr-buffer-position)
-        (buffer (buffer-name))
-        (local-content-hash ytr-buffer-local-content-hash))
+  (let* ((issue-node-cons ytr-buffer-issue-node-cons)
+         (issue-code (car issue-node-cons))
+         (node-code (cdr issue-node-cons))
+         (node-type ytr-buffer-node-type)
+         (position ytr-buffer-position)
+         (buffer (buffer-name))
+         (local-content-hash ytr-buffer-local-content-hash))
     (cl-case ytr-buffer-node-type
-      (description (ytr-send-issue-alist ytr-buffer-issue-code `((description . ,(buffer-string)))))
-      (comment (ytr-send-issue-comment-alist (cons ytr-buffer-issue-code ytr-buffer-node-code) `((text . ,(buffer-string)))))
+      (description (ytr-send-issue-alist issue-code `((description . ,(buffer-string)))))
+      (comment (ytr-send-issue-comment-alist ytr-buffer-issue-node-cons `((text . ,(buffer-string)))))
       (t (user-error "Wrong node type %s" ytr-buffer-node-type)))
     (message "Node successfully updated")
     (set-window-configuration ytr-buffer-wconf)
     (ytr-add-issue-to-history issue-code)
     (kill-buffer buffer)
-    (kill-new (ytr-issue-node-code-action (cons issue-code node-code)))
+    (kill-new (ytr-issue-node-code-action issue-node-cons))
     (when position ;; use position as flag for source buffer
       (save-excursion
         (goto-char position)
@@ -590,7 +592,7 @@ ATTACH-DIR is the org attachment directory."
            (org-set-property ytr-org-remote-content-hash-property-name
                              (let ((content (cl-case node-type
                                               (description (alist-get 'description (ytr-retrieve-issue-alist issue-code)))
-                                              (comment (alist-get 'text (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))))))
+                                              (comment (alist-get 'text (ytr-retrieve-issue-comment-alist issue-node-cons))))))
                                (if content (sha1 content) "")))
            (org-set-property ytr-org-local-content-hash-property-name local-content-hash))
           (kill
@@ -624,7 +626,7 @@ ATTACH-DIR is the org attachment directory."
                   ytr-buffer-text text
                   ytr-buffer-wconf wconf
                   ytr-buffer-curlevel curlevel
-                  ytr-buffer-issue-code issue-code
+                  ytr-buffer-issue-node-cons issue-node-cons
                   ytr-buffer-node-type 'comment
                   ytr-buffer-commit-type 'create
                   ytr-buffer-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text))))))
@@ -632,16 +634,15 @@ ATTACH-DIR is the org attachment directory."
 (defun ytr-quick-comment-action (&optional issue-node-cons)
   "Open a markdown buffer to write a quick comment for ISSUE-NODE-CONS."
   (interactive (list (ytr-get-issue-node-cons-by-strategy)))
-  (let ((issue-code (car issue-node-cons))
-        (wconf (current-window-configuration)))
+  (let ((wconf (current-window-configuration)))
     (switch-to-buffer-other-window (get-buffer-create "*YTR Compose Comment*"))
     (ytr-commit-new-comment-mode)
-    (message "Create new comment on issue %s. C-c to submit, C-k to cancel" issue-code)
+    (message "Create new comment on issue %s. C-c to submit, C-k to cancel" (car issue-node-cons))
     (setq-local ytr-buffer-position nil ;; position is used as flag for source buffer
                 ytr-buffer-text ""
                 ytr-buffer-wconf wconf
                 ytr-buffer-curlevel 0
-                ytr-buffer-issue-code issue-code
+                ytr-buffer-issue-node-cons issue-node-cons
                 ytr-buffer-node-type 'comment
                 ytr-buffer-commit-type 'create
                 ytr-buffer-local-content-hash nil)))
@@ -655,7 +656,7 @@ ATTACH-DIR is the org attachment directory."
     (switch-to-buffer-other-window (get-buffer-create "*YTR Edit Comment*"))
     (insert
      (if node-code
-         (alist-get 'text (ytr-retrieve-issue-comment-alist (cons issue-code node-code)))
+         (alist-get 'text (ytr-retrieve-issue-comment-alist issue-node-cons))
        (alist-get 'description (ytr-retrieve-issue-alist issue-code))))
     (ytr-commit-update-node-mode)
     (message "Edit node %s. C-c to submit, C-k to cancel" (ytr-issue-node-code-action issue-node-cons))
@@ -663,8 +664,7 @@ ATTACH-DIR is the org attachment directory."
                 ytr-buffer-wconf wconf
                 ytr-buffer-commit-type 'update
                 ytr-buffer-node-type (if node-code 'comment 'description)
-                ytr-buffer-issue-code issue-code
-                ytr-buffer-node-code node-code
+                ytr-buffer-issue-node-cons issue-node-cons
                 ytr-buffer-local-content-hash nil)))
 
 (defun ytr-new-issue ()
@@ -699,7 +699,7 @@ ATTACH-DIR is the org attachment directory."
          (node-code (cdr issue-node-cons))
          (content (cl-case type
                     (description (alist-get 'description (ytr-retrieve-issue-alist issue-code)))
-                    (comment (alist-get 'text (ytr-retrieve-issue-comment-alist (cons issue-code node-code))))
+                    (comment (alist-get 'text (ytr-retrieve-issue-comment-alist issue-node-cons)))
                     (t (user-error (format "Unknown node type: %s" type)))))
          (current-remote-hash (if content (sha1 content) ""))
          (import-remote-hash (org-entry-get (point) ytr-org-remote-content-hash-property-name t))
@@ -718,8 +718,7 @@ ATTACH-DIR is the org attachment directory."
                 ytr-buffer-wconf wconf
                 ytr-buffer-commit-type 'update
                 ytr-buffer-node-type type
-                ytr-buffer-issue-code issue-code
-                ytr-buffer-node-code node-code
+                ytr-buffer-issue-node-cons issue-node-cons
                 ytr-buffer-local-content-hash (sha1 (ytr-trim-blank-lines-leading-and-trailing text)))))
 
 (defun ytr-send-node ()
